@@ -47,5 +47,6 @@
   "Stack Image Sync": "Синхронизация стопок",
   "Stop": "$t(Common:Stop)",
   "Themes": "Tемы",
-  "Zoom": "Масштаб"
+  "Zoom": "Масштаб",
+  "Text": "Текст"
 }

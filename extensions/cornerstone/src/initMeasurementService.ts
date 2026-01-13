@@ -30,6 +30,7 @@ const initMeasurementService = (
     EllipticalROI,
     CircleROI,
     ArrowAnnotate,
+    Text,
     Angle,
     CobbAngle,
     RectangleROI,
@@ -102,6 +103,14 @@ const initMeasurementService = (
     ArrowAnnotate.matchingCriteria,
     ArrowAnnotate.toAnnotation,
     ArrowAnnotate.toMeasurement
+  );
+
+  measurementService.addMapping(
+    csTools3DVer1MeasurementSource,
+    'Text',
+    Text.matchingCriteria,
+    Text.toAnnotation,
+    Text.toMeasurement
   );
 
   measurementService.addMapping(

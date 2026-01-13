@@ -3595,3 +3595,41 @@ export const ToolLabelmapEditWithContour = (props: IconProps) => (
     />
   </svg>
 );
+export const ToolText = (props: IconProps) => (
+  <svg
+    width="28px"
+    height="28px"
+    viewBox="0 0 28 28"
+    version="1.1"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <g
+      id="tool-text"
+      stroke="none"
+      strokeWidth="1"
+      fill="none"
+      fillRule="evenodd"
+    >
+      <rect
+        id="Rectangle"
+        x="0"
+        y="0"
+        width="28"
+        height="28"
+      />
+      <text
+        x="50%"
+        y="50%"
+        dominantBaseline="middle"
+        textAnchor="middle"
+        fontSize="18"
+        fontFamily="Arial, sans-serif"
+        fontWeight="bold"
+        fill="currentColor"
+      >
+        A
+      </text>
+    </g>
+  </svg>
+);

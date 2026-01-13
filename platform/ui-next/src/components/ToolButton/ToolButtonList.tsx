@@ -142,12 +142,21 @@ const ToolButtonListItem = React.forwardRef<
 >(({ className, children, icon, disabledText, tooltip, disabled, ...props }, ref) => {
   const defaultTooltip = tooltip || (typeof children === 'string' ? children : undefined);
 
+  // Исключаем не-DOM props перед передачей в DropdownMenuItem
+  const {
+    evaluate,
+    visible,
+    isActive,
+    evaluateProps,
+    ...domProps
+  } = props;
+
   const menuItem = (
     <DropdownMenuItem
       ref={ref}
       className={cn('flex items-center space-x-2', className)}
       disabled={disabled}
-      {...props}
+      {...domProps}
     >
       {icon && (
         <Icons.ByName

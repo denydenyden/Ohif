@@ -51,6 +51,7 @@ import * as polySeg from '@cornerstonejs/polymorphic-segmentation';
 
 import CalibrationLineTool from './tools/CalibrationLineTool';
 import ImageOverlayViewerTool from './tools/ImageOverlayViewerTool';
+import TextTool from './tools/TextTool';
 
 export default function initCornerstoneTools(configuration = {}) {
   CrosshairsTool.isAnnotation = false;
@@ -85,6 +86,7 @@ export default function initCornerstoneTools(configuration = {}) {
   addTool(CircleROITool);
   addTool(BidirectionalTool);
   addTool(ArrowAnnotateTool);
+  addTool(TextTool);
   addTool(DragProbeTool);
   addTool(AngleTool);
   addTool(CobbAngleTool);
@@ -144,6 +146,7 @@ export default function initCornerstoneTools(configuration = {}) {
     CircleROITool,
     BidirectionalTool,
     ArrowAnnotateTool,
+    TextTool,
     DragProbeTool,
     AngleTool,
     CobbAngleTool,
@@ -196,6 +199,7 @@ export default function initCornerstoneTools(configuration = {}) {
 const toolNames = {
   Pan: PanTool.toolName,
   ArrowAnnotate: ArrowAnnotateTool.toolName,
+  Text: TextTool.toolName,
   WindowLevel: WindowLevelTool.toolName,
   StackScroll: StackScrollTool.toolName,
   Zoom: ZoomTool.toolName,

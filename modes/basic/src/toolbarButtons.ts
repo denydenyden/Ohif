@@ -497,6 +497,17 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'Text',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-text',
+      label: i18n.t('Buttons:Text'),
+      tooltip: i18n.t('Buttons:Text'),
+      commands: setToolActiveToolbar,
+      evaluate: 'evaluate.cornerstoneTool',
+    },
+  },
+  {
     id: 'EllipticalROI',
     uiType: 'ohif.toolButton',
     props: {

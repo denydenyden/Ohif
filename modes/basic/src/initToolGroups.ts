@@ -57,6 +57,24 @@ function initDefaultToolGroup(extensionManager, toolGroupService, commandsManage
         },
       },
       {
+        toolName: toolNames.Text,
+        configuration: {
+          getTextCallback: (callback, eventDetails) => {
+            commandsManager.runCommand('textCallback', {
+              callback,
+              eventDetails,
+            });
+          },
+          changeTextCallback: (data, eventDetails, callback) => {
+            commandsManager.runCommand('textCallback', {
+              callback,
+              data,
+              eventDetails,
+            });
+          },
+        },
+      },
+      {
         toolName: toolNames.SegmentBidirectional,
       },
       { toolName: toolNames.Bidirectional },
@@ -82,10 +100,7 @@ function initDefaultToolGroup(extensionManager, toolGroupService, commandsManage
       { toolName: toolNames.LivewireContour },
       { toolName: toolNames.WindowLevelRegion },
     ],
-    enabled: [
-      { toolName: toolNames.ImageOverlayViewer },
-      { toolName: toolNames.ReferenceLines },
-    ],
+    enabled: [{ toolName: toolNames.ImageOverlayViewer }, { toolName: toolNames.ReferenceLines }],
     disabled: [
       {
         toolName: toolNames.AdvancedMagnify,

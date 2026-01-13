@@ -245,6 +245,7 @@ export const toolbarSections = {
     'Length',
     'Bidirectional',
     'ArrowAnnotate',
+    'Text',
     'EllipticalROI',
     'RectangleROI',
     'CircleROI',

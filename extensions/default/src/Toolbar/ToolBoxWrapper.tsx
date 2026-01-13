@@ -21,32 +21,54 @@ export function ToolBoxButtonGroupWrapper({ buttonSection, id }) {
 
   return (
     <div className="bg-popover flex flex-row space-x-1 rounded-md px-0 py-0">
-      {items.map(item => (
-        <ToolButton
-          {...item}
-          key={item.id}
-          size="small"
-          className={item.disabled && 'text-foreground/70'}
-          onInteraction={event => {
-            onInteraction?.({
-              event,
-              id,
-              commands: item.commands,
-              itemId: item.id,
-              item,
-            });
-          }}
-        />
-      ))}
+      {items.map(item => {
+        // Исключаем не-DOM props из каждого item
+        const {
+          evaluate,
+          visible,
+          isActive: _itemIsActive,
+          evaluateProps,
+          ...itemDomProps
+        } = item;
+
+        return (
+          <ToolButton
+            {...itemDomProps}
+            isActive={item.isActive}
+            key={item.id}
+            size="small"
+            className={item.disabled && 'text-foreground/70'}
+            onInteraction={event => {
+              onInteraction?.({
+                event,
+                id,
+                commands: item.commands,
+                itemId: item.id,
+                item,
+              });
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
 
 export function ToolBoxButtonWrapper({ onInteraction, className, options, ...props }) {
+  // Исключаем не-DOM props из props
+  const {
+    evaluate,
+    visible,
+    isActive,
+    evaluateProps,
+    ...domProps
+  } = props;
+
   return (
     <div className="bg-popover flex flex-row rounded-md px-0 py-0">
       <ToolButton
-        {...props}
+        {...domProps}
+        isActive={props.isActive}
         id={props.id}
         size="small"
         className={classNames(props.disabled && 'text-foreground/70', className)}

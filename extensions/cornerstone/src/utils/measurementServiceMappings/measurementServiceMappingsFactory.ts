@@ -4,6 +4,7 @@ import Bidirectional from './Bidirectional';
 import EllipticalROI from './EllipticalROI';
 import CircleROI from './CircleROI';
 import ArrowAnnotate from './ArrowAnnotate';
+import Text from './Text';
 import CobbAngle from './CobbAngle';
 import Angle from './Angle';
 import PlanarFreehandROI from './PlanarFreehandROI';
@@ -44,6 +45,7 @@ const measurementServiceMappingsFactory = (
       PlanarFreehandROI: POLYLINE,
       Bidirectional: BIDIRECTIONAL,
       ArrowAnnotate: POINT,
+      Text: POINT,
       CobbAngle: ANGLE,
       Angle: ANGLE,
       SplineROI: POLYLINE,
@@ -218,6 +220,23 @@ const measurementServiceMappingsFactory = (
       toAnnotation: ArrowAnnotate.toAnnotation,
       toMeasurement: csToolsAnnotation =>
         ArrowAnnotate.toMeasurement(
+          csToolsAnnotation,
+          displaySetService,
+          cornerstoneViewportService,
+          _getValueTypeFromToolType,
+          customizationService
+        ),
+      matchingCriteria: [
+        {
+          valueType: MeasurementService.VALUE_TYPES.POINT,
+          points: 1,
+        },
+      ],
+    },
+    Text: {
+      toAnnotation: Text.toAnnotation,
+      toMeasurement: csToolsAnnotation =>
+        Text.toMeasurement(
           csToolsAnnotation,
           displaySetService,
           cornerstoneViewportService,

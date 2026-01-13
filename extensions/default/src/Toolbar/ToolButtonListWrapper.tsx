@@ -36,6 +36,15 @@ export default function ToolButtonListWrapper({ buttonSection, id }: ToolButtonL
 
   const items = toolbarButtons.map(button => button.componentProps);
 
+  // Исключаем не-DOM props из primary
+  const {
+    evaluate,
+    visible,
+    isActive: _isActive,
+    evaluateProps,
+    ...primaryDomProps
+  } = primary;
+
   return (
     <ToolButtonList>
       <ToolButtonListDefault>
@@ -45,7 +54,8 @@ export default function ToolButtonListWrapper({ buttonSection, id }: ToolButtonL
           data-active={primary.isActive}
         >
           <ToolButton
-            {...primary}
+            {...primaryDomProps}
+            isActive={primary.isActive}
             onInteraction={({ itemId }) =>
               onInteraction?.({ id, itemId, commands: primary.commands })
             }
@@ -57,10 +67,19 @@ export default function ToolButtonListWrapper({ buttonSection, id }: ToolButtonL
       <div data-cy={`${id}-split-button-secondary`}>
         <ToolButtonListDropDown>
           {items.map(item => {
+            // Исключаем не-DOM props из каждого item
+            const {
+              evaluate,
+              visible,
+              isActive: _itemIsActive,
+              evaluateProps,
+              ...itemDomProps
+            } = item;
+
             return (
               <ToolButtonListItem
                 key={item.id}
-                {...item}
+                {...itemDomProps}
                 data-cy={item.id}
                 data-tool={item.id}
                 data-active={item.isActive}

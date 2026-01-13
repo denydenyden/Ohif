@@ -847,6 +847,30 @@ function commandsModule({
       });
       callback?.(value);
     },
+    textCallback: async ({ callback, data }) => {
+      // Для Text tool всегда показываем попап, даже если labelConfig не настроен
+      const labelConfig = customizationService.getCustomization('measurementLabels');
+      const renderContent = customizationService.getCustomization('ui.labellingComponent');
+
+      if (!labelConfig) {
+        const label = await callInputDialog({
+          uiDialogService,
+          title: i18n.t('Tools:Enter new text'),
+          placeholder: i18n.t('Tools:Enter new text'),
+          defaultValue: data?.data?.label || '',
+        });
+
+        callback?.(label);
+        return;
+      }
+
+      const value = await callInputDialogAutoComplete({
+        uiDialogService,
+        labelConfig,
+        renderContent,
+      });
+      callback?.(value);
+    },
 
     toggleCine: () => {
       const { viewports } = viewportGridService.getState();
@@ -2577,6 +2601,9 @@ function commandsModule({
     },
     arrowTextCallback: {
       commandFn: actions.arrowTextCallback,
+    },
+    textCallback: {
+      commandFn: actions.textCallback,
     },
     setViewportActive: {
       commandFn: actions.setViewportActive,

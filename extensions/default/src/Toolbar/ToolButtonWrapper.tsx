@@ -4,6 +4,15 @@ import { useIconPresentation, Icons, Button } from '@ohif/ui-next';
 export default function ToolButtonWrapper(props) {
   const { IconContainer, containerProps } = useIconPresentation();
 
+  // Исключаем не-DOM props из props
+  const {
+    evaluate,
+    visible,
+    isActive,
+    evaluateProps,
+    ...domProps
+  } = props;
+
   const Icon = <Icons.ByName name={props.icon} />;
 
   return (
@@ -11,7 +20,7 @@ export default function ToolButtonWrapper(props) {
       {IconContainer ? (
         <IconContainer
           disabled={props.disabled}
-          {...props}
+          {...domProps}
           {...containerProps}
         >
           {Icon}
