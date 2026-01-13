@@ -63,5 +63,7 @@ Keep entries brief and focused on what matters for future context.
 
 ## Recent Changes
 
-- [2024] Initial project setup and dev environment configuration
+- Initial project setup and dev environment configuration
 - Created README.ds.md with Ubuntu Server (prod) and Mac (dev) setup guides
+- Annotation styling: all lines and text are white with black borders via CSS drop-shadow, text size
+  40px, disabled text input popup for ArrowAnnotate
