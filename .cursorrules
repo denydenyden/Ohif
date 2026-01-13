@@ -1,0 +1,67 @@
+# OHIF Viewer Project Rules
+
+## Project Overview
+
+OHIF (Open Health Imaging Foundation) Viewer - web-based medical imaging viewer for DICOM images.
+Monorepo structure managed with Lerna and Yarn Workspaces.
+
+## Tech Stack
+
+- **Runtime**: Node.js 18+, Yarn 1.20.0+
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Build**: Webpack (dev), Rsbuild (experimental fast mode)
+- **Medical Imaging**: Cornerstone3D for 2D/3D rendering
+- **Architecture**: Monorepo with extensions and modes system
+
+## Project Structure
+
+```
+platform/     - Core platform (app, core, ui, ui-next, i18n, cli)
+extensions/   - Feature extensions (cornerstone, dicom-*, measurement-tracking, etc.)
+modes/        - Workflow modes (basic, longitudinal, segmentation, etc.)
+```
+
+## Development Setup
+
+- **Mac Apple Silicon**: Use `caffeinate -i yarn run dev` for performance cores
+- **Ubuntu Server**: Standard `yarn run build` for production
+- Always use `yarn install --frozen-lockfile` for security
+- Enable Yarn Workspaces: `yarn config set workspaces-experimental true`
+
+## Key Commands
+
+- `yarn run dev` - Development server (localhost:3000)
+- `yarn run dev:fast` - Fast dev mode (rsbuild)
+- `yarn run build` - Production build
+- `yarn run test:unit` - Run tests
+
+## Code Style
+
+- TypeScript/JavaScript with React
+- Follow existing code patterns in extensions and modes
+- Use extension system for new features
+- Maintain PWA compatibility
+
+## Important Context
+
+- This is a "dumb client" - no data storage, only configuration
+- Works with DICOMweb-compatible image archives
+- Highly configurable and extensible via extension system
+- Supports multiple workflow modes
+
+## Auto-Update Rules
+
+**IMPORTANT**: After completing significant changes, update this file with:
+
+1. New features or extensions added
+2. Configuration changes
+3. Build/deployment process updates
+4. Important architectural decisions
+5. Dependencies or tooling changes
+
+Keep entries brief and focused on what matters for future context.
+
+## Recent Changes
+
+- [2024] Initial project setup and dev environment configuration
+- Created README.ds.md with Ubuntu Server (prod) and Mac (dev) setup guides
