@@ -231,6 +231,24 @@ function initMPRToolGroup(extensionManager, toolGroupService, commandsManager) {
           },
         },
       },
+      {
+        toolName: toolNames.Text,
+        configuration: {
+          getTextCallback: (callback, eventDetails) => {
+            commandsManager.runCommand('textCallback', {
+              callback,
+              eventDetails,
+            });
+          },
+          changeTextCallback: (data, eventDetails, callback) => {
+            commandsManager.runCommand('textCallback', {
+              callback,
+              data,
+              eventDetails,
+            });
+          },
+        },
+      },
       { toolName: toolNames.Bidirectional },
       { toolName: toolNames.DragProbe },
       { toolName: toolNames.Probe },
