@@ -490,8 +490,8 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'tool-annotate',
-      label: i18n.t('Buttons:Annotation'),
-      tooltip: i18n.t('Buttons:Arrow Annotate'),
+      label: i18n.t('Buttons:Arrow'),
+      tooltip: i18n.t('Buttons:Arrow'),
       commands: setToolActiveToolbar,
       evaluate: 'evaluate.cornerstoneTool',
     },

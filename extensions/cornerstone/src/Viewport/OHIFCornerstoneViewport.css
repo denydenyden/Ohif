@@ -21,7 +21,7 @@
   /* Prevents the entire page from getting larger
      when the magnify tool is near the sides/corners of the page */
   overflow: hidden;
-  
+
   /* Prevent text selection on the viewport element */
   user-select: none;
   -webkit-user-select: none;
@@ -43,4 +43,49 @@
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
+}
+
+/* Белые линии с черной обводкой для всех SVG элементов аннотаций */
+.cornerstone-viewport-element svg line,
+.cornerstone-viewport-element svg polyline,
+.cornerstone-viewport-element svg path:not([d='']),
+.cornerstone-viewport-element svg ellipse,
+.cornerstone-viewport-element svg circle,
+.cornerstone-viewport-element svg polygon,
+.viewport-wrapper svg line,
+.viewport-wrapper svg polyline,
+.viewport-wrapper svg path:not([d='']),
+.viewport-wrapper svg ellipse,
+.viewport-wrapper svg circle,
+.viewport-wrapper svg polygon {
+  stroke: #ffffff !important;
+  stroke-width: 2px !important;
+  stroke-dasharray: none !important;
+  stroke-dashoffset: 0 !important;
+  fill: none !important;
+  filter: drop-shadow(0 0 0.5px #000000) drop-shadow(0 0 0.5px #000000) !important;
+}
+
+/* Для текста аннотаций - белый текст с черной обводкой */
+.cornerstone-viewport-element svg text,
+.viewport-wrapper svg text {
+  fill: rgb(255, 255, 255) !important;
+  stroke: rgb(0, 0, 0) !important;
+  stroke-width: 3px !important;
+  paint-order: stroke fill !important;
+  stroke-linejoin: round !important;
+  stroke-linecap: round !important;
+}
+
+/* Специальные стили для стрелок */
+.cornerstone-viewport-element svg path[id*='arrow'],
+.cornerstone-viewport-element svg polygon[id*='arrow'],
+.viewport-wrapper svg path[id*='arrow'],
+.viewport-wrapper svg polygon[id*='arrow'] {
+  stroke: #ffffff !important;
+  stroke-width: 2px !important;
+  stroke-dasharray: none !important;
+  stroke-dashoffset: 0 !important;
+  fill: none !important;
+  filter: drop-shadow(0 0 0.5px #000000) drop-shadow(0 0 0.5px #000000) !important;
 }

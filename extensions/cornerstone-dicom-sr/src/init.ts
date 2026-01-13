@@ -36,21 +36,23 @@ export default function init({
   // TODO - fix the SR display of Cobb Angle, as it joins the two lines
   addToolInstance(toolNames.SRCobbAngle, CobbAngleTool);
 
-  // Modify annotation tools to use dashed lines on SR
-  const dashedLine = {
-    lineDash: '4,4',
+  // Modify annotation tools to use white color and solid lines (no dashes)
+  const solidLineStyle = {
+    color: 'rgb(255, 255, 255)',
+    textBoxColor: 'rgb(255, 255, 255)',
+    lineDash: '',
   };
   annotation.config.style.setToolGroupToolStyles('SRToolGroup', {
-    [toolNames.DICOMSRDisplay]: dashedLine,
-    SRLength: dashedLine,
-    SRBidirectional: dashedLine,
-    SREllipticalROI: dashedLine,
-    SRCircleROI: dashedLine,
-    SRArrowAnnotate: dashedLine,
-    SRCobbAngle: dashedLine,
-    SRAngle: dashedLine,
-    SRPlanarFreehandROI: dashedLine,
-    SRRectangleROI: dashedLine,
+    [toolNames.DICOMSRDisplay]: solidLineStyle,
+    SRLength: solidLineStyle,
+    SRBidirectional: solidLineStyle,
+    SREllipticalROI: solidLineStyle,
+    SRCircleROI: solidLineStyle,
+    SRArrowAnnotate: solidLineStyle,
+    SRCobbAngle: solidLineStyle,
+    SRAngle: solidLineStyle,
+    SRPlanarFreehandROI: solidLineStyle,
+    SRRectangleROI: solidLineStyle,
     global: {},
   });
 }

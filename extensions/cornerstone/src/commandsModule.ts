@@ -827,6 +827,7 @@ function commandsModule({
       const renderContent = customizationService.getCustomization('ui.labellingComponent');
 
       if (!labelConfig) {
+        /*
         const label = await callInputDialog({
           uiDialogService,
           title: i18n.t('Tools:Edit Arrow Text'),
@@ -835,6 +836,7 @@ function commandsModule({
         });
 
         callback?.(label);
+        */
         return;
       }
 

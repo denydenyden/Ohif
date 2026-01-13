@@ -117,10 +117,13 @@ export default function initCornerstoneTools(configuration = {}) {
   addTool(SculptorTool);
   addTool(SplineContourSegmentationTool);
   addTool(LabelMapEditWithContourTool);
-  // Modify annotation tools to use dashed lines on SR
+  // Modify annotation tools to use white color, solid lines, and black borders
   const annotationStyle = {
-    textBoxFontSize: '15px',
+    textBoxFontSize: '40px',
     lineWidth: '1.5',
+    color: 'rgb(255, 255, 255)',
+    textBoxColor: 'rgb(255, 255, 255)',
+    lineDash: '',
   };
 
   const defaultStyles = annotation.config.style.getDefaultToolStyles();
@@ -130,6 +133,64 @@ export default function initCornerstoneTools(configuration = {}) {
       ...annotationStyle,
     },
   });
+
+  // Переопределяем метод getStyle для всех инструментов аннотаций, чтобы всегда возвращать белый цвет
+  // Это нужно для того, чтобы активные (выбранные) аннотации тоже были белыми, а не зелеными
+  const annotationTools = [
+    LengthTool,
+    RectangleROITool,
+    RectangleROIThresholdTool,
+    EllipticalROITool,
+    CircleROITool,
+    BidirectionalTool,
+    ArrowAnnotateTool,
+    DragProbeTool,
+    AngleTool,
+    CobbAngleTool,
+    PlanarFreehandROITool,
+    SplineROITool,
+    LivewireContourTool,
+    SegmentBidirectionalTool,
+    CalibrationLineTool,
+  ];
+
+  annotationTools.forEach(ToolClass => {
+    if (ToolClass && ToolClass.prototype) {
+      // Переопределяем getStyle
+      const originalGetStyle = ToolClass.prototype.getStyle;
+      if (originalGetStyle) {
+        ToolClass.prototype.getStyle = function (property, styleSpecifier, annotation) {
+          const value = originalGetStyle.call(this, property, styleSpecifier, annotation);
+          // Если запрашивается цвет, всегда возвращаем белый
+          if (property === 'color') {
+            return 'rgb(255, 255, 255)';
+          }
+          // Если запрашивается lineDash, всегда возвращаем пустую строку (сплошная линия)
+          if (property === 'lineDash') {
+            return '';
+          }
+          return value;
+        };
+      }
+
+      // Переопределяем getAnnotationStyle, если он существует
+      const originalGetAnnotationStyle = ToolClass.prototype.getAnnotationStyle;
+      if (originalGetAnnotationStyle) {
+        ToolClass.prototype.getAnnotationStyle = function (options) {
+          const style = originalGetAnnotationStyle.call(this, options);
+          // Всегда используем белый цвет и сплошные линии
+          return {
+            ...style,
+            color: 'rgb(255, 255, 255)',
+            lineDash: '',
+          };
+        };
+      }
+    }
+  });
+
+  // Черные границы теперь добавляются через CSS (OHIFCornerstoneViewport.css)
+  // Это намного проще и надежнее, чем переопределение методов рендеринга
 }
 
 const toolNames = {
