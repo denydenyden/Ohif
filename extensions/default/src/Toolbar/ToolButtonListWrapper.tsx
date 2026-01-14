@@ -60,6 +60,7 @@ export default function ToolButtonListWrapper({ buttonSection, id }: ToolButtonL
               onInteraction?.({ id, itemId, commands: primary.commands })
             }
             className={primary.className}
+            disabled={primary.disabled}
           />
         </div>
       </ToolButtonListDefault>

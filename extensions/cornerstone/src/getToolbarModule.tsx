@@ -426,6 +426,9 @@ export default function getToolbarModule({ servicesManager, extensionManager }: 
         return {
           disabled: false,
           isActive: isPrimaryActive,
+          className: isPrimaryActive
+            ? 'bg-primary-light'
+            : '!text-common-bright hover:!bg-primary-dark hover:!text-primary-light',
         };
       },
     },

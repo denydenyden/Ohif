@@ -5,16 +5,16 @@ import type { EventTypes } from '@cornerstonejs/tools';
 import guid from '@ohif/core/src/utils/guid';
 
 /**
- * TextTool - инструмент для добавления текстовых аннотаций
- * При клике сразу показывает попап для ввода текста
- * Рисует только текст, без стрелки и линии
+ * TextTool - A tool for adding text annotations.
+ * On click, immediately shows a popup for text input.
+ * Renders only text, without arrow and connecting line.
  */
 class TextTool extends ArrowAnnotateTool {
   static toolName = 'Text';
 
   /**
-   * Переопределяем addNewAnnotation для создания аннотации с одной точкой
-   * и немедленного показа попапа
+   * Override addNewAnnotation to create annotation with a single point
+   * and immediately show the popup
    */
   addNewAnnotation = (evt: EventTypes.InteractionEventType) => {
     const eventDetail = evt.detail;
@@ -27,10 +27,10 @@ class TextTool extends ArrowAnnotateTool {
 
     const { viewport } = enabledElement;
 
-    // Получаем координаты клика в мировых координатах
+    // Get click coordinates in world space
     const worldPos = currentPoints.world;
 
-    // Создаем аннотацию с одной точкой (место клика)
+    // Create annotation with a single point (click location)
     const newAnnotation = this.createAnnotation({
       worldPos,
       viewport,
@@ -41,17 +41,17 @@ class TextTool extends ArrowAnnotateTool {
       return null;
     }
 
-    // Сохраняем аннотацию
+    // Save annotation
     annotation.state.addAnnotation(newAnnotation);
 
-    // Сразу показываем попап для ввода текста
+    // Immediately show popup for text input
     const config = this.configuration;
     if (config?.getTextCallback) {
       config.getTextCallback(
         (text: string) => {
-          // Сохраняем текст в аннотацию
+          // Save text to annotation
           newAnnotation.data.text = text || '';
-          // Обновляем аннотацию
+          // Invalidate annotation to trigger re-render
           newAnnotation.invalidated = true;
           const renderingEngine = viewport.getRenderingEngine();
           renderingEngine.renderViewports([viewport.id]);
@@ -68,7 +68,7 @@ class TextTool extends ArrowAnnotateTool {
   };
 
   /**
-   * Создает аннотацию с одной точкой
+   * Creates annotation with a single point
    */
   private createAnnotation({
     worldPos,
@@ -81,7 +81,7 @@ class TextTool extends ArrowAnnotateTool {
   }) {
     const annotationUID = guid();
 
-    // Получаем referencedImageId
+    // Get referencedImageId
     const canvasPos = viewport.worldToCanvas(worldPos);
     let referencedImageId: string | undefined;
 
@@ -97,7 +97,9 @@ class TextTool extends ArrowAnnotateTool {
 
     const FrameOfReferenceUID = viewport.getFrameOfReferenceUID();
 
-    // Создаем аннотацию с ОДНОЙ точкой (место клика)
+    // Create annotation with a single point (click location)
+    // Note: We use two identical points for compatibility with ArrowAnnotateTool
+    // but only use the first point during rendering
     const newAnnotation: any = {
       annotationUID,
       highlighted: false,
@@ -111,13 +113,13 @@ class TextTool extends ArrowAnnotateTool {
         viewUp: viewport.getCamera().viewUp,
       },
       data: {
-        text: '', // Текст будет добавлен после ввода
+        text: '', // Text will be added after input
         handles: {
-          // Добавляем две одинаковые точки для совместимости с ArrowAnnotateTool
-          // При рендеринге используем только первую точку
+          // Two identical points for compatibility with ArrowAnnotateTool
+          // Only the first point is used during rendering
           points: [worldPos, worldPos],
           textBox: {
-            worldPosition: worldPos, // Позиция текста = место клика
+            worldPosition: worldPos, // Text position = click location (center)
           },
         },
         cachedStats: {},
@@ -128,8 +130,8 @@ class TextTool extends ArrowAnnotateTool {
   }
 
   /**
-   * Переопределяем isPointNearTool для работы с одной точкой
-   * ArrowAnnotateTool ожидает две точки, а у нас только одна
+   * Override isPointNearTool to work with a single point
+   * ArrowAnnotateTool expects two points, but we only have one
    */
   isPointNearTool = (
     element: HTMLDivElement,
@@ -149,7 +151,7 @@ class TextTool extends ArrowAnnotateTool {
       return false;
     }
 
-    // Проверяем близость к точке клика (первая и единственная точка)
+    // Check proximity to click point (first and only point)
     const clickPoint = data.handles.points[0];
     const canvasPoint = viewport.worldToCanvas(clickPoint);
 
@@ -157,7 +159,7 @@ class TextTool extends ArrowAnnotateTool {
       Math.pow(canvasCoords[0] - canvasPoint[0], 2) + Math.pow(canvasCoords[1] - canvasPoint[1], 2)
     );
 
-    // Также проверяем близость к textBox, если он есть
+    // Also check proximity to textBox if it exists
     if (data.handles?.textBox?.worldBoundingBox) {
       const { topLeft, bottomRight } = data.handles.textBox.worldBoundingBox;
       const topLeftCanvas = viewport.worldToCanvas(topLeft);
@@ -178,20 +180,20 @@ class TextTool extends ArrowAnnotateTool {
   };
 
   /**
-   * Переопределяем renderAnnotation - рисуем только текст, без стрелки и линии
+   * Override renderAnnotation - render only text, without arrow and line
    */
   renderAnnotation = (enabledElement: Types.IEnabledElement, svgDrawingHelper: any): boolean => {
     const { viewport } = enabledElement;
     const { element } = viewport;
 
-    // Получаем все аннотации этого инструмента (Text)
+    // Get all annotations for this tool (Text)
     const annotations = annotation.state.getAnnotations(this.getToolName(), element);
 
     if (!annotations?.length) {
       return false;
     }
 
-    // Получаем текущий imageId из viewport для фильтрации аннотаций
+    // Get current imageId from viewport for filtering annotations
     let currentImageId: string | undefined;
     if ((viewport as any).getCurrentImageId) {
       currentImageId = (viewport as any).getCurrentImageId();
@@ -206,18 +208,18 @@ class TextTool extends ArrowAnnotateTool {
       const annotationItem = annotations[i];
       const { annotationUID, data, metadata } = annotationItem;
 
-      // Фильтруем аннотации по текущему изображению
-      // Показываем только те аннотации, которые относятся к текущему изображению
+      // Filter annotations by current image
+      // Only show annotations that belong to the current image
       if (currentImageId && metadata?.referencedImageId && metadata.referencedImageId !== currentImageId) {
         continue;
       }
 
-      // Проверяем наличие точки (место клика)
+      // Check for point (click location)
       if (!data?.handles?.points?.length) {
         continue;
       }
 
-      // Получаем стили для текста
+      // Get styles for text
       const styleSpecifierWithAnnotation = {
         ...styleSpecifier,
         annotationUID,
@@ -225,52 +227,49 @@ class TextTool extends ArrowAnnotateTool {
 
       const textBoxOptions = this.getLinkedTextBoxStyle(styleSpecifierWithAnnotation, annotationItem);
 
-      // Получаем текст из аннотации
+      // Get text from annotation
       const textLines = data.text ? [data.text] : [''];
 
-      // Точка клика - это центр текста
+      // Click point is the center of the text
       const clickPoint = data.handles.points[0];
 
-      // Инициализируем textBox, если его нет
+      // Initialize textBox if it doesn't exist
       if (!data.handles.textBox) {
         data.handles.textBox = {};
       }
 
-      // Определяем центр текста в мировых координатах
-      // Используем сохраненный центр, если он есть (после первого рендеринга)
-      // Иначе используем точку клика
-      let textBoxCenterWorld: Types.Point3;
-      if (data.handles.textBox.worldPosition) {
-        // Используем сохраненный центр (стабильная позиция)
-        textBoxCenterWorld = data.handles.textBox.worldPosition;
-      } else {
-        // При первом рендеринге используем точку клика как центр
-        textBoxCenterWorld = clickPoint;
+      // Determine text center in world coordinates
+      // Use saved center if available (after first render), otherwise use click point
+      const textBoxCenterWorld: Types.Point3 = data.handles.textBox.worldPosition || clickPoint;
+
+      // Save center if not set
+      if (!data.handles.textBox.worldPosition) {
         data.handles.textBox.worldPosition = clickPoint;
       }
 
-      // Преобразуем центр в canvas координаты
+      // Convert center to canvas coordinates
       const textBoxCenterCanvas = viewport.worldToCanvas(textBoxCenterWorld);
 
-      // Получаем размер текста (кэшируем для оптимизации)
+      // Get text size (cache for optimization)
+      const currentText = textLines.join('\n');
       let textWidth: number;
       let textHeight: number;
 
-      const currentText = textLines.join('\n');
-      if (data.handles.textBox.cachedSize &&
-          data.handles.textBox.cachedText === currentText) {
-        // Используем сохраненный размер
+      if (data.handles.textBox.cachedSize && data.handles.textBox.cachedText === currentText) {
+        // Use cached size
         textWidth = data.handles.textBox.cachedSize.width;
         textHeight = data.handles.textBox.cachedSize.height;
       } else {
-        // Нужно получить размер текста
-        // Временно рисуем текст в центре, чтобы получить его размер
+        // Need to get text size
+        // First render at approximate position to get size, then re-render at correct position
+        // We'll use the real element but update its position after getting the size
+        const approximatePosition: Types.Point2 = textBoxCenterCanvas;
         const tempBoundingBox = drawing.drawTextBox(
           svgDrawingHelper,
-          `${annotationUID}-temp`,
-          'temp',
+          annotationUID,
+          'textBox',
           textLines,
-          textBoxCenterCanvas,
+          approximatePosition,
           textBoxOptions
         );
 
@@ -281,19 +280,22 @@ class TextTool extends ArrowAnnotateTool {
         textWidth = tempBoundingBox.width;
         textHeight = tempBoundingBox.height;
 
-        // Сохраняем размер для следующего рендеринга
+        // Cache size for next render
         data.handles.textBox.cachedSize = { width: textWidth, height: textHeight };
         data.handles.textBox.cachedText = currentText;
+
+        // Now we have the size, so we'll re-render at the correct position below
+        // The element will be updated in place by the next drawTextBox call
       }
 
-      // ВСЕГДА вычисляем позицию левого верхнего угла так, чтобы центр был в textBoxCenterCanvas
-      // Это гарантирует, что текст всегда центрирован относительно точки клика
+      // Always calculate top-left position so center is at textBoxCenterCanvas
+      // This ensures text is always centered relative to click point
       const textBoxPosition: Types.Point2 = [
         textBoxCenterCanvas[0] - textWidth / 2,
         textBoxCenterCanvas[1] - textHeight / 2,
       ];
 
-      // Рисуем текст в правильной позиции (центр совпадает с точкой клика)
+      // Render text at correct position (center matches click point)
       const boundingBox = drawing.drawTextBox(
         svgDrawingHelper,
         annotationUID,
@@ -303,11 +305,11 @@ class TextTool extends ArrowAnnotateTool {
         textBoxOptions
       );
 
-      // Сохраняем boundingBox и обновляем центр, если нужно
+      // Save boundingBox and update center if needed
       if (boundingBox && data.handles.textBox) {
         const { x: left, y: top, width, height } = boundingBox;
 
-        // Сохраняем boundingBox
+        // Save boundingBox
         data.handles.textBox.worldBoundingBox = {
           topLeft: viewport.canvasToWorld([left, top]),
           topRight: viewport.canvasToWorld([left + width, top]),
@@ -315,16 +317,15 @@ class TextTool extends ArrowAnnotateTool {
           bottomRight: viewport.canvasToWorld([left + width, top + height]),
         };
 
-        // Вычисляем фактический центр текста и обновляем worldPosition
-        // Это нужно для точности, так как реальный размер может немного отличаться
+        // Calculate actual text center and update worldPosition
+        // This is needed for accuracy, as actual size may differ slightly
         const centerX = left + width / 2;
         const centerY = top + height / 2;
         const centerCanvas: Types.Point2 = [centerX, centerY];
         const actualCenterWorld = viewport.canvasToWorld(centerCanvas);
 
-        // Обновляем центр только если он еще не был установлен или текст изменился
-        if (!data.handles.textBox.worldPosition ||
-            data.handles.textBox.cachedText !== currentText) {
+        // Update center only if not set or text changed
+        if (!data.handles.textBox.worldPosition || data.handles.textBox.cachedText !== currentText) {
           data.handles.textBox.worldPosition = actualCenterWorld;
         }
       }
