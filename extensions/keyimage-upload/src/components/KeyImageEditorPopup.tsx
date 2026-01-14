@@ -249,11 +249,8 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           );
 
           if (toolGroup) {
-            // Add popup viewport to the same toolGroup
-            toolGroup.addViewport(POPUP_VIEWPORT_ID, popupEnabledElement.renderingEngineId);
-            console.log('[KeyImage] Added popup viewport to toolGroup:', toolGroup.id);
-
-            // Synchronize camera and properties from active viewport to popup viewport
+            // Synchronize camera and properties BEFORE adding to toolGroup
+            // This ensures annotations are rendered with correct coordinates from the start
             try {
               const activeViewport = activeEnabledElement.viewport;
               const popupViewport = popupEnabledElement.viewport;
@@ -271,11 +268,66 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
                 const properties = activeViewport.getProperties();
                 popupViewport.setProperties(properties);
 
-                // Render popup viewport to apply changes
-                popupViewport.render();
+                // Trigger resize BEFORE adding to toolGroup to recalculate coordinates
+                // This ensures annotations are rendered with correct coordinates from the start
+                try {
+                  const renderingEngine = cornerstoneViewportService.getRenderingEngine();
+                  if (renderingEngine) {
+                    // Use requestAnimationFrame for smoother update
+                    requestAnimationFrame(() => {
+                      try {
+                        // Resize rendering engine to recalculate coordinates
+                        renderingEngine.resize();
+                        renderingEngine.render();
+
+                        // Now add to toolGroup after resize is complete
+                        // This ensures annotations are rendered with correct coordinates
+                        requestAnimationFrame(() => {
+                          toolGroup.addViewport(
+                            POPUP_VIEWPORT_ID,
+                            popupEnabledElement.renderingEngineId
+                          );
+                          console.log(
+                            '[KeyImage] Added popup viewport to toolGroup after resize:',
+                            toolGroup.id
+                          );
+                        });
+                      } catch (resizeError) {
+                        console.warn('[KeyImage] Error triggering resize:', resizeError);
+                        // Fallback: add to toolGroup even if resize fails
+                        toolGroup.addViewport(
+                          POPUP_VIEWPORT_ID,
+                          popupEnabledElement.renderingEngineId
+                        );
+                      }
+                    });
+                  } else {
+                    // Fallback: add to toolGroup if rendering engine not available
+                    toolGroup.addViewport(POPUP_VIEWPORT_ID, popupEnabledElement.renderingEngineId);
+                    console.log('[KeyImage] Added popup viewport to toolGroup:', toolGroup.id);
+                  }
+                } catch (resizeError) {
+                  console.warn('[KeyImage] Error triggering resize:', resizeError);
+                  // Fallback: add to toolGroup even if resize fails
+                  toolGroup.addViewport(POPUP_VIEWPORT_ID, popupEnabledElement.renderingEngineId);
+                  console.log(
+                    '[KeyImage] Added popup viewport to toolGroup (fallback):',
+                    toolGroup.id
+                  );
+                }
+              } else {
+                // Not StackViewport, just add to toolGroup
+                toolGroup.addViewport(POPUP_VIEWPORT_ID, popupEnabledElement.renderingEngineId);
+                console.log('[KeyImage] Added popup viewport to toolGroup:', toolGroup.id);
               }
             } catch (syncError) {
               console.warn('[KeyImage] Error synchronizing viewport settings:', syncError);
+              // Fallback: add to toolGroup even if sync fails
+              toolGroup.addViewport(POPUP_VIEWPORT_ID, popupEnabledElement.renderingEngineId);
+              console.log(
+                '[KeyImage] Added popup viewport to toolGroup (error fallback):',
+                toolGroup.id
+              );
             }
           } else {
             console.warn('[KeyImage] ToolGroup not found for active viewport');
