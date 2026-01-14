@@ -63,7 +63,14 @@ Expected response format:
 
 ## Implementation Details
 
-- Crop tool uses `RectangleROI` from Cornerstone3D
-- Crop annotations are automatically removed after successful save
-- PNG export includes all annotations except crop rectangle
+- **Custom Crop tool** - independent canvas overlay implementation:
+  - Dashed blue line (matching primary button color: `rgb(94, 129, 244)`)
+  - Dark overlay outside crop area for better visibility
+  - Blue corner handles for visual feedback
+  - No text labels or measurements
+  - Completely independent from Cornerstone annotations
+  - Automatically cleared after successful save
+  - Automatically cleared when popup closes
+- PNG export includes all Cornerstone annotations (Text, Arrow)
+- Crop area is applied during PNG generation (not as annotation)
 - Viewport settings (zoom, pan, window/level) are synchronized with main viewer

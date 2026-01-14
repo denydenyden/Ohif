@@ -41,7 +41,11 @@ Open http://localhost:3000
 #### Crop (new!)
 - **Crop** - draw a rectangle around the area
 - Hint should appear: "💡 Draw a rectangle on the image..."
-- Only the last rectangle will be used for crop
+- Rectangle appears as **dashed blue line** with dark overlay outside
+- Blue corner handles visible for visual feedback
+- No text or measurements displayed
+- Completely independent from Cornerstone annotations
+- Cleared automatically after save or when closing popup
 
 ### 4. Saving
 
@@ -63,12 +67,12 @@ Click "Save KeyImage" button:
 #### Without Crop
 - Full image is saved
 - All annotations included (Text, Arrow)
-- RectangleROI NOT included in export
 
 #### With Crop
 - Only selected area is saved
 - Annotations within crop area are included
 - Image cropped to rectangle boundaries
+- Crop overlay is NOT included in export (it's on separate canvas)
 
 ### 6. Check Request
 
@@ -105,10 +109,12 @@ window.config = {
 
 ## Known Features
 
-1. **Crop annotation** - visible only until save, automatically removed after
-2. **RectangleROI** - used as Crop tool, not displayed in export
-3. **Study UID required** - save impossible without it
-4. **Notifications** - success shown 5 sec, error 8 sec
+1. **Custom Crop tool** - independent canvas overlay, not a Cornerstone annotation
+2. **Crop styling** - dashed blue line with dark overlay, blue corner handles
+3. **Crop cleanup** - automatically cleared after save or when closing popup
+4. **No annotation conflicts** - Crop doesn't interfere with Text/Arrow annotations
+5. **Study UID required** - save impossible without it
+6. **Notifications** - success shown 5 sec, error 8 sec
 
 ## Troubleshooting
 
@@ -122,9 +128,10 @@ window.config = {
 - Check logs in DevTools Console
 
 ### Crop not working
-- Make sure RectangleROI tool is active (Crop button)
+- Make sure Crop tool is active (Crop button highlighted)
 - Draw a rectangle on the image
-- Only the last rectangle is used
+- You should see dark overlay outside the rectangle
+- Blue dashed border and corner handles should appear
 
 ### Loading indicator stuck
 - Check Network in DevTools - request may be hanging

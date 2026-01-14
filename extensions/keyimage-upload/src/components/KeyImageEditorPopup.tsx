@@ -38,11 +38,104 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   onClose,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null);
   const { cornerstoneViewportService, toolGroupService, viewportGridService, toolbarService } =
     servicesManager.services;
   const [activeTool, setActiveTool] = useState<string>('WindowLevel');
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [cropArea, setCropArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [isDrawingCrop, setIsDrawingCrop] = useState<boolean>(false);
+  const cropStartRef = useRef<{ x: number; y: number } | null>(null);
   const isSavingTextAnnotationRef = useRef<boolean>(false);
+
+  // Draw crop overlay on canvas
+  const drawCropOverlay = useCallback(() => {
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const crop = cropArea || (isDrawingCrop && cropStartRef.current ? {
+      x: Math.min(cropStartRef.current.x, cropStartRef.current.x),
+      y: Math.min(cropStartRef.current.y, cropStartRef.current.y),
+      width: 0,
+      height: 0,
+    } : null);
+
+    if (!crop) return;
+
+    // Draw dark overlay outside crop area
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    
+    // Top
+    ctx.fillRect(0, 0, canvas.width, crop.y);
+    // Bottom
+    ctx.fillRect(0, crop.y + crop.height, canvas.width, canvas.height - (crop.y + crop.height));
+    // Left
+    ctx.fillRect(0, crop.y, crop.x, crop.height);
+    // Right
+    ctx.fillRect(crop.x + crop.width, crop.y, canvas.width - (crop.x + crop.width), crop.height);
+
+    // Draw crop border - dashed blue line
+    ctx.strokeStyle = 'rgb(94, 129, 244)'; // Blue matching Save button
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]); // Dashed pattern
+    ctx.strokeRect(crop.x, crop.y, crop.width, crop.height);
+    ctx.setLineDash([]); // Reset
+
+    // Draw resize handles (corners)
+    const handleSize = 8;
+    ctx.fillStyle = 'rgb(94, 129, 244)';
+    const corners = [
+      { x: crop.x, y: crop.y }, // top-left
+      { x: crop.x + crop.width, y: crop.y }, // top-right
+      { x: crop.x, y: crop.y + crop.height }, // bottom-left
+      { x: crop.x + crop.width, y: crop.y + crop.height }, // bottom-right
+    ];
+    corners.forEach(corner => {
+      ctx.fillRect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
+    });
+  }, [cropArea, isDrawingCrop]);
+
+  // Redraw crop overlay when crop area changes
+  useEffect(() => {
+    drawCropOverlay();
+  }, [cropArea, isDrawingCrop, drawCropOverlay]);
+
+  // Setup crop canvas size to match viewport
+  useEffect(() => {
+    const updateCropCanvasSize = () => {
+      const popupElement = document.querySelector(
+        `[data-viewportid="${POPUP_VIEWPORT_ID}"]`
+      ) as HTMLElement;
+      
+      if (!popupElement || !cropCanvasRef.current) return;
+
+      const canvas = popupElement.querySelector('canvas.cornerstone-canvas') as HTMLCanvasElement;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      cropCanvasRef.current.width = rect.width;
+      cropCanvasRef.current.height = rect.height;
+      cropCanvasRef.current.style.width = `${rect.width}px`;
+      cropCanvasRef.current.style.height = `${rect.height}px`;
+      
+      drawCropOverlay();
+    };
+
+    // Update size initially and on window resize
+    const timer = setInterval(updateCropCanvasSize, 500);
+    window.addEventListener('resize', updateCropCanvasSize);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('resize', updateCropCanvasSize);
+    };
+  }, [drawCropOverlay]);
 
   // Track when text annotation is being saved to prevent modal closing
   useEffect(() => {
@@ -86,6 +179,11 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     if (isSavingTextAnnotationRef.current) {
       return;
     }
+
+    // Clean up crop state
+    setCropArea(null);
+    setIsDrawingCrop(false);
+    cropStartRef.current = null;
 
     // Small delay to allow text input dialog to close first
     setTimeout(() => {
@@ -351,6 +449,28 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
 
   // Handler for tool activation
   const handleToolActivation = (toolName: string) => {
+    // Special handling for Crop tool (custom implementation)
+    if (toolName === 'Crop') {
+      if (activeTool === 'Crop') {
+        // Deactivate Crop
+        setActiveTool('WindowLevel');
+        commandsManager.runCommand('setToolActiveToolbar', {
+          toolName: 'WindowLevel',
+          toolGroupIds: [toolGroupId],
+        });
+      } else {
+        // Activate Crop
+        setActiveTool('Crop');
+        // Deactivate any Cornerstone tools
+        commandsManager.runCommand('setToolActiveToolbar', {
+          toolName: '',
+          toolGroupIds: [toolGroupId],
+        });
+      }
+      return;
+    }
+
+    // Normal tool activation
     setActiveTool(toolName);
     commandsManager.runCommand('setToolActiveToolbar', {
       toolName,
@@ -358,57 +478,53 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     });
   };
 
-  // Get crop area from RectangleROI annotation
-  const getCropArea = (): { x: number; y: number; width: number; height: number } | null => {
-    try {
-      const popupElement = document.querySelector(
-        `[data-viewportid="${POPUP_VIEWPORT_ID}"]`
-      ) as HTMLElement;
+  // Handle crop canvas mouse events
+  const handleCropMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeTool !== 'Crop') return;
 
-      if (!popupElement) return null;
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
 
-      const enabledElement = getEnabledElement(popupElement as any);
-      if (!enabledElement) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-      // Get all RectangleROI annotations for viewport
-      const annotations = annotationModule.state.getAnnotations(
-        'RectangleROI',
-        enabledElement.FrameOfReferenceUID
-      );
+    // Clear existing crop and start new one
+    setCropArea(null);
+    setIsDrawingCrop(true);
+    cropStartRef.current = { x, y };
+  }, [activeTool]);
 
-      if (!annotations || annotations.length === 0) return null;
+  const handleCropMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawingCrop || !cropStartRef.current) return;
 
-      // Take the last created annotation (most recent)
-      const rectangleAnnotation = annotations[annotations.length - 1];
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
 
-      if (!rectangleAnnotation?.data?.handles?.points) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-      const points = rectangleAnnotation.data.handles.points;
-      const viewport = enabledElement.viewport as StackViewport;
+    const startX = cropStartRef.current.x;
+    const startY = cropStartRef.current.y;
 
-      // Convert world coordinates to canvas coordinates
-      const canvasPoints = points.map(point => viewport.worldToCanvas(point));
+    const newCrop = {
+      x: Math.min(startX, x),
+      y: Math.min(startY, y),
+      width: Math.abs(x - startX),
+      height: Math.abs(y - startY),
+    };
 
-      // Calculate bounding box
-      const xs = canvasPoints.map(p => p[0]);
-      const ys = canvasPoints.map(p => p[1]);
+    // Temporarily set crop for preview
+    setCropArea(newCrop);
+  }, [isDrawingCrop]);
 
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
-
-      return {
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY,
-      };
-    } catch (error) {
-      console.error('[KeyImage] Error getting crop area:', error);
-      return null;
+  const handleCropMouseUp = useCallback(() => {
+    if (isDrawingCrop) {
+      setIsDrawingCrop(false);
+      cropStartRef.current = null;
     }
-  };
+  }, [isDrawingCrop]);
 
   const handleSave = async () => {
     setIsUploading(true);
@@ -481,25 +597,10 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       // Send to server
       const response = await sendKeyImageToServer(pngBlob, metadata);
 
-      // Remove RectangleROI annotation after successful save
-      try {
-        const enabledElement = getEnabledElement(popupElement as any);
-        if (enabledElement) {
-          const annotations = annotationModule.state.getAnnotations(
-            'RectangleROI',
-            enabledElement.FrameOfReferenceUID
-          );
-
-          if (annotations && annotations.length > 0) {
-            annotations.forEach(ann => {
-              annotationModule.state.removeAnnotation(ann.annotationUID);
-            });
-            enabledElement.viewport.render();
-          }
-        }
-      } catch (e) {
-        console.warn('[KeyImage] Error removing crop annotation:', e);
-      }
+      // Clear crop area after successful save
+      setCropArea(null);
+      setIsDrawingCrop(false);
+      cropStartRef.current = null;
 
       // Show success notification
       const { uiNotificationService } = servicesManager.services;
@@ -531,8 +632,6 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   ): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       try {
-        const cropArea = getCropArea(); // Get crop area if exists
-
         const canvasRect = canvas.getBoundingClientRect();
         const displayedWidth = Math.round(canvasRect.width);
         const displayedHeight = Math.round(canvasRect.height);
@@ -621,16 +720,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
 
         if (svgLayer && svgLayer.children.length > 0) {
           const svgClone = svgLayer.cloneNode(true) as SVGElement;
-          
-          // Remove RectangleROI annotations (crop tool) from export
-          const allGroups = svgClone.querySelectorAll('g');
-          allGroups.forEach(group => {
-            const dataId = group.getAttribute('data-id');
-            if (dataId && dataId.includes('RectangleROI')) {
-              group.remove();
-            }
-          });
-          
+
           processTextAnnotationsInPopup(svgClone, true);
           applyWhiteSolidStyles(svgClone);
 
@@ -644,13 +734,13 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
 
           let viewBoxX = offsetX === 0 ? 0 : -offsetX;
           let viewBoxY = offsetY === 0 ? 0 : -offsetY;
-          
+
           // Adjust viewBox for crop mode
           if (cropArea) {
             viewBoxX = cropArea.x;
             viewBoxY = cropArea.y;
           }
-          
+
           svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${width} ${height}`);
           svgClone.setAttribute('preserveAspectRatio', 'none');
 
@@ -984,14 +1074,14 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
         />
 
         {/* Crop Tool - only for KeyImage popup */}
-        <div className="border-l border-[#333] pl-2 ml-2">
+        <div className="ml-2 border-l border-[#333] pl-2">
           <ToolButton
-            id="RectangleROI"
+            id="Crop"
             icon="tool-rectangle"
             label="Crop"
             tooltip="Select Area to Crop"
-            isActive={activeTool === 'RectangleROI'}
-            onInteraction={() => handleToolActivation('RectangleROI')}
+            isActive={activeTool === 'Crop'}
+            onInteraction={() => handleToolActivation('Crop')}
           />
         </div>
 
@@ -1015,8 +1105,8 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       </div>
 
       {/* Hint for Crop tool */}
-      {activeTool === 'RectangleROI' && (
-        <div className="mb-2 rounded bg-primary/20 px-3 py-2 text-sm text-white">
+      {activeTool === 'Crop' && (
+        <div className="bg-primary/20 mb-2 rounded px-3 py-2 text-sm text-white">
           💡 Draw a rectangle on the image to select the area to save
         </div>
       )}
@@ -1024,7 +1114,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       {/* Cornerstone Viewport */}
       <div
         ref={containerRef}
-        className="min-h-0 flex-1"
+        className="relative min-h-0 flex-1"
       >
         <Suspense
           fallback={
@@ -1047,6 +1137,22 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
             initialImageIndex={initialImageIndex}
           />
         </Suspense>
+
+        {/* Crop Canvas Overlay */}
+        {activeTool === 'Crop' && (
+          <canvas
+            ref={cropCanvasRef}
+            className="pointer-events-auto absolute left-0 top-0"
+            style={{
+              cursor: 'crosshair',
+              zIndex: 1000,
+            }}
+            onMouseDown={handleCropMouseDown}
+            onMouseMove={handleCropMouseMove}
+            onMouseUp={handleCropMouseUp}
+            onMouseLeave={handleCropMouseUp}
+          />
+        )}
       </div>
 
       {/* Loading Overlay */}
@@ -1054,7 +1160,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="flex flex-col items-center space-y-4">
             <Icons.LoadingSpinner className="h-12 w-12 text-white" />
-            <p className="text-white text-lg">Saving KeyImage...</p>
+            <p className="text-lg text-white">Saving KeyImage...</p>
           </div>
         </div>
       )}
