@@ -67,3 +67,5 @@ Keep entries brief and focused on what matters for future context.
 - Created README.ds.md with Ubuntu Server (prod) and Mac (dev) setup guides
 - Annotation styling: all lines and text are white with black borders via CSS drop-shadow, text size
   40px, disabled text input popup for ArrowAnnotate
+- Added TextTool: independent text-only annotation tool (no arrow/line), text centered at click point, anchored to image
+- Fixed React warnings: filtered non-DOM props (evaluate, visible, isActive) in ToolButtonWrapper, ToolButtonListWrapper, ToolBoxWrapper components
