@@ -43,7 +43,12 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     servicesManager.services;
   const [activeTool, setActiveTool] = useState<string>('WindowLevel');
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [cropArea, setCropArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [cropArea, setCropArea] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [isDrawingCrop, setIsDrawingCrop] = useState<boolean>(false);
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
   const isSavingTextAnnotationRef = useRef<boolean>(false);
@@ -59,18 +64,22 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const crop = cropArea || (isDrawingCrop && cropStartRef.current ? {
-      x: Math.min(cropStartRef.current.x, cropStartRef.current.x),
-      y: Math.min(cropStartRef.current.y, cropStartRef.current.y),
-      width: 0,
-      height: 0,
-    } : null);
+    const crop =
+      cropArea ||
+      (isDrawingCrop && cropStartRef.current
+        ? {
+            x: Math.min(cropStartRef.current.x, cropStartRef.current.x),
+            y: Math.min(cropStartRef.current.y, cropStartRef.current.y),
+            width: 0,
+            height: 0,
+          }
+        : null);
 
     if (!crop) return;
 
     // Draw dark overlay outside crop area
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    
+
     // Top
     ctx.fillRect(0, 0, canvas.width, crop.y);
     // Bottom
@@ -112,7 +121,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       const popupElement = document.querySelector(
         `[data-viewportid="${POPUP_VIEWPORT_ID}"]`
       ) as HTMLElement;
-      
+
       if (!popupElement || !cropCanvasRef.current) return;
 
       const canvas = popupElement.querySelector('canvas.cornerstone-canvas') as HTMLCanvasElement;
@@ -123,7 +132,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       cropCanvasRef.current.height = rect.height;
       cropCanvasRef.current.style.width = `${rect.width}px`;
       cropCanvasRef.current.style.height = `${rect.height}px`;
-      
+
       drawCropOverlay();
     };
 
@@ -479,45 +488,51 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   };
 
   // Handle crop canvas mouse events
-  const handleCropMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== 'Crop') return;
+  const handleCropMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (activeTool !== 'Crop') return;
 
-    const canvas = cropCanvasRef.current;
-    if (!canvas) return;
+      const canvas = cropCanvasRef.current;
+      if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-    // Clear existing crop and start new one
-    setCropArea(null);
-    setIsDrawingCrop(true);
-    cropStartRef.current = { x, y };
-  }, [activeTool]);
+      // Clear existing crop and start new one
+      setCropArea(null);
+      setIsDrawingCrop(true);
+      cropStartRef.current = { x, y };
+    },
+    [activeTool]
+  );
 
-  const handleCropMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawingCrop || !cropStartRef.current) return;
+  const handleCropMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!isDrawingCrop || !cropStartRef.current) return;
 
-    const canvas = cropCanvasRef.current;
-    if (!canvas) return;
+      const canvas = cropCanvasRef.current;
+      if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-    const startX = cropStartRef.current.x;
-    const startY = cropStartRef.current.y;
+      const startX = cropStartRef.current.x;
+      const startY = cropStartRef.current.y;
 
-    const newCrop = {
-      x: Math.min(startX, x),
-      y: Math.min(startY, y),
-      width: Math.abs(x - startX),
-      height: Math.abs(y - startY),
-    };
+      const newCrop = {
+        x: Math.min(startX, x),
+        y: Math.min(startY, y),
+        width: Math.abs(x - startX),
+        height: Math.abs(y - startY),
+      };
 
-    // Temporarily set crop for preview
-    setCropArea(newCrop);
-  }, [isDrawingCrop]);
+      // Temporarily set crop for preview
+      setCropArea(newCrop);
+    },
+    [isDrawingCrop]
+  );
 
   const handleCropMouseUp = useCallback(() => {
     if (isDrawingCrop) {
@@ -632,154 +647,175 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   ): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       try {
+        // Use NATIVE canvas resolution, not displayed CSS size
+        // This prevents distortion/downsampling and keeps original quality
+        const nativeWidth = canvas.width;
+        const nativeHeight = canvas.height;
+
+        // Calculate scaling factor between display (CSS) and native (Bitmap)
+        // We use this to translate crop coordinates (which are in CSS pixels) to native pixels
         const canvasRect = canvas.getBoundingClientRect();
-        const displayedWidth = Math.round(canvasRect.width);
-        const displayedHeight = Math.round(canvasRect.height);
+        const displayWidth = canvasRect.width || nativeWidth;
+        const displayHeight = canvasRect.height || nativeHeight;
 
-        // If crop area exists - use it, otherwise use full canvas
-        let width = cropArea ? Math.round(cropArea.width) : displayedWidth;
-        let height = cropArea ? Math.round(cropArea.height) : displayedHeight;
-        let offsetX = cropArea ? Math.round(cropArea.x) : 0;
-        let offsetY = cropArea ? Math.round(cropArea.y) : 0;
-        const padding = 5;
+        const scaleX = nativeWidth / displayWidth;
+        const scaleY = nativeHeight / displayHeight;
 
-        const scaleX = displayedWidth / canvas.width;
-        const scaleY = displayedHeight / canvas.height;
+        // Determine output dimensions and offsets in NATIVE pixels
+        let outputWidth = nativeWidth;
+        let outputHeight = nativeHeight;
+        let outputX = 0;
+        let outputY = 0;
 
-        // Check if SVG annotations extend beyond canvas (only if not in crop mode)
-        if (!cropArea && svgLayer && svgLayer.children.length > 0) {
+        // Increased padding to prevent arrow cutoffs (markers often extend beyond bounding box)
+        const padding = 20;
+
+        if (cropArea) {
+          // Crop mode: Convert crop area (CSS pixels) to Native pixels
+          outputX = Math.round(cropArea.x * scaleX);
+          outputY = Math.round(cropArea.y * scaleY);
+          outputWidth = Math.round(cropArea.width * scaleX);
+          outputHeight = Math.round(cropArea.height * scaleY);
+        } else if (svgLayer && svgLayer.children.length > 0) {
+          // Auto-expand mode (only if not manually cropping)
+
+          // helper getSVGBoundingBox returns coordinates in NATIVE pixels directly
           const svgBBox = getSVGBoundingBox(svgLayer, canvas);
-          if (svgBBox) {
-            const displayedMinX = svgBBox.minX * scaleX;
-            const displayedMinY = svgBBox.minY * scaleY;
-            const displayedMaxX = svgBBox.maxX * scaleX;
-            const displayedMaxY = svgBBox.maxY * scaleY;
 
-            const extendsLeft = displayedMinX < 0;
-            const extendsTop = displayedMinY < 0;
-            const extendsRight = displayedMaxX > width;
-            const extendsBottom = displayedMaxY > height;
+          if (svgBBox) {
+            // svgBBox is already in native pixels, NO need to scale again
+            const svgMinX = svgBBox.minX;
+            const svgMinY = svgBBox.minY;
+            const svgMaxX = svgBBox.maxX;
+            const svgMaxY = svgBBox.maxY;
+
+            // Check boundaries
+            const extendsLeft = svgMinX < 0;
+            const extendsTop = svgMinY < 0;
+            const extendsRight = svgMaxX > nativeWidth;
+            const extendsBottom = svgMaxY > nativeHeight;
 
             if (extendsLeft || extendsTop || extendsRight || extendsBottom) {
-              const newMinX = Math.min(0, displayedMinX);
-              const newMinY = Math.min(0, displayedMinY);
-              const newMaxX = Math.max(width, displayedMaxX);
-              const newMaxY = Math.max(height, displayedMaxY);
+              // Expand canvas to fit annotations
+              const newMinX = Math.min(0, svgMinX);
+              const newMinY = Math.min(0, svgMinY);
+              const newMaxX = Math.max(nativeWidth, svgMaxX);
+              const newMaxY = Math.max(nativeHeight, svgMaxY);
 
-              offsetX = newMinX - padding;
-              offsetY = newMinY - padding;
-              width = Math.ceil(newMaxX - newMinX + padding * 2);
-              height = Math.ceil(newMaxY - newMinY + padding * 2);
+              outputX = Math.floor(newMinX - padding);
+              outputY = Math.floor(newMinY - padding);
+              outputWidth = Math.ceil(newMaxX - newMinX + padding * 2);
+              outputHeight = Math.ceil(newMaxY - newMinY + padding * 2);
             }
           }
         }
 
         const outputCanvas = document.createElement('canvas');
-        outputCanvas.width = width;
-        outputCanvas.height = height;
+        outputCanvas.width = outputWidth;
+        outputCanvas.height = outputHeight;
         const ctx = outputCanvas.getContext('2d');
         if (!ctx) {
           reject(new Error('Failed to get canvas context'));
           return;
         }
 
+        // Fill black background
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillRect(0, 0, outputWidth, outputHeight);
 
-        // Draw canvas with crop support
-        if (cropArea) {
-          // Crop mode: draw only selected area
-          const canvasScaleX = canvas.width / displayedWidth;
-          const canvasScaleY = canvas.height / displayedHeight;
+        // Draw image data
+        // We draw from the source canvas (native pixels) to output canvas
+        // Source Rect: [outputX, outputY, outputWidth, outputHeight] (clamped to canvas bounds)
+        // If outputX is negative (due to annotation overflow), we draw the image offseted
 
-          ctx.drawImage(
-            canvas,
-            cropArea.x * canvasScaleX,
-            cropArea.y * canvasScaleY,
-            cropArea.width * canvasScaleX,
-            cropArea.height * canvasScaleY,
-            0,
-            0,
-            width,
-            height
-          );
-        } else {
-          // Normal mode: draw full canvas
-          ctx.drawImage(
-            canvas,
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-            offsetX,
-            offsetY,
-            displayedWidth,
-            displayedHeight
-          );
+        const drawX = outputX < 0 ? -outputX : 0; // Where to draw on output canvas
+        const drawY = outputY < 0 ? -outputY : 0;
+
+        // Source coordinates matching valid canvas area
+        const sourceX = Math.max(0, outputX);
+        const sourceY = Math.max(0, outputY);
+        // Width/Height to copy - clamp to what's available in source
+        const sourceW = Math.min(outputWidth, nativeWidth - sourceX);
+        const sourceH = Math.min(outputHeight, nativeHeight - sourceY);
+
+        if (sourceW > 0 && sourceH > 0) {
+            ctx.drawImage(
+                canvas,
+                sourceX, sourceY, sourceW, sourceH, // Source
+                drawX, drawY, sourceW, sourceH      // Dest
+            );
         }
 
+        // Draw SVG Overlay
         if (svgLayer && svgLayer.children.length > 0) {
           const svgClone = svgLayer.cloneNode(true) as SVGElement;
 
-          processTextAnnotationsInPopup(svgClone, true);
+          // processTextAnnotationsInPopup DESTROYS Arrow annotations (which consist of lines + text).
+          // Since TextTool is "text-only" (no lines), this function is unnecessary for Text
+          // and harmful for Arrows. Disabling it to preserve Arrows.
+          // processTextAnnotationsInPopup(svgClone, true);
+
           applyWhiteSolidStyles(svgClone);
 
-          const svgExportWidth = width;
-          const svgExportHeight = height;
+          // We must set the SVG width/height to match our OUTPUT canvas
+          svgClone.setAttribute('width', String(outputWidth));
+          svgClone.setAttribute('height', String(outputHeight));
 
-          svgClone.removeAttribute('width');
-          svgClone.removeAttribute('height');
-          svgClone.setAttribute('width', String(svgExportWidth));
-          svgClone.setAttribute('height', String(svgExportHeight));
+          // ViewBox must map to the NATIVE coordinate system we just defined
+          // The original SVG uses the viewport's client size (CSS pixels) usually
+          // But our new canvas is scaled by `scaleX`/`scaleY`
+          // So we need to correct the viewBox to represent the `outputX/Y` region
+          // but in CSS pixels logic? No, wait.
+          // The SVG annotations are defined in CSS-pixel-like coordinates usually (client space).
+          // BUT since we just scaled the backing image up to native, we effectively zoomed in.
+          // If we want the SVG to match the image, we probably need to keep the viewBox in CSS pixels
+          // but scaled or ...
+          //
+          // SIMPLER APPROACH:
+          // The SVG overlay sits on top of the canvas in the DOM.
+          // If canvas is 1000px wide (native) but displayed at 500px (css), scale is 2.
+          // The SVG coordinates are likely in the 500px space (if it's an overlay).
+          // So if we have a line from 0 to 500, it covers the whole image.
+          // Our output canvas is 1000px wide.
+          // If we use viewBox="0 0 500 500", it will stretch to the 1000px width. That is correct!
+          // So viewBox should be in "Display/CSS Coordinates".
 
-          let viewBoxX = offsetX === 0 ? 0 : -offsetX;
-          let viewBoxY = offsetY === 0 ? 0 : -offsetY;
+          // Convert our NATIVE output coordinates back to CSS coordinates for viewBox
+          const viewBoxX = outputX / scaleX;
+          const viewBoxY = outputY / scaleY;
+          const viewBoxW = outputWidth / scaleX;
+          const viewBoxH = outputHeight / scaleY;
 
-          // Adjust viewBox for crop mode
-          if (cropArea) {
-            viewBoxX = cropArea.x;
-            viewBoxY = cropArea.y;
-          }
-
-          svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${width} ${height}`);
+          svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
           svgClone.setAttribute('preserveAspectRatio', 'none');
 
           if (!svgClone.getAttribute('xmlns')) {
             svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
           }
 
-          increaseAnnotationFontSize(svgClone);
+          // increaseAnnotationFontSize(svgClone);
 
           const svgData = new XMLSerializer().serializeToString(svgClone);
+          // Use encodeURIComponent to handle special chars safely
           const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
           const url = URL.createObjectURL(svgBlob);
 
           const img = new Image();
           img.onload = function () {
             try {
-              ctx.drawImage(img, 0, 0, svgExportWidth, svgExportHeight);
+              // Draw SVG scaled up to full native resolution
+              ctx.drawImage(img, 0, 0, outputWidth, outputHeight);
               URL.revokeObjectURL(url);
               outputCanvas.toBlob(
-                blob => {
-                  if (blob) {
-                    resolve(blob);
-                  } else {
-                    reject(new Error('Failed to create PNG'));
-                  }
-                },
+                blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
                 'image/png',
                 1.0
               );
             } catch (e) {
               URL.revokeObjectURL(url);
+              // Try to save anyway if SVG fails
               outputCanvas.toBlob(
-                blob => {
-                  if (blob) {
-                    resolve(blob);
-                  } else {
-                    reject(new Error('Failed to create PNG'));
-                  }
-                },
+                blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
                 'image/png',
                 1.0
               );
@@ -787,31 +823,19 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           };
           img.onerror = function () {
             URL.revokeObjectURL(url);
-            outputCanvas.toBlob(
-              blob => {
-                if (blob) {
-                  resolve(blob);
-                } else {
-                  reject(new Error('Failed to create PNG'));
-                }
-              },
-              'image/png',
-              1.0
-            );
+             outputCanvas.toBlob(
+                blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
+                'image/png',
+                1.0
+              );
           };
           img.src = url;
         } else {
-          outputCanvas.toBlob(
-            blob => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error('Failed to create PNG'));
-              }
-            },
-            'image/png',
-            1.0
-          );
+           outputCanvas.toBlob(
+                blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
+                'image/png',
+                1.0
+              );
         }
       } catch (e) {
         reject(new Error('Error creating PNG: ' + (e as Error).message));
@@ -889,7 +913,13 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       let linesBefore = 0;
       for (let i = index - 1; i >= 0; i--) {
         const element = allChildren[i];
-        if (element && element.tagName === 'line') {
+        if (element && (element.tagName === 'line' || element.tagName === 'LINE')) {
+          // Check if this line is part of an Arrow (has markers)
+          // If so, DO NOT hide it.
+          if (element.getAttribute('marker-end') || element.getAttribute('marker-start')) {
+            break; // Stop looking this direction, it's an arrow
+          }
+
           if (removeInsteadOfHide) {
             element.remove();
           } else {
@@ -898,14 +928,20 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           }
           linesBefore++;
           if (linesBefore >= 3) break;
-        } else if (element && element.tagName !== 'line') {
+        } else if (element && element.tagName !== 'line' && element.tagName !== 'LINE') {
           break;
         }
       }
 
       for (let i = index + 1; i < allChildren.length; i++) {
         const element = allChildren[i];
-        if (element && element.tagName === 'line') {
+        if (element && (element.tagName === 'line' || element.tagName === 'LINE')) {
+          // Check if this line is part of an Arrow (has markers)
+          // If so, DO NOT hide it.
+          if (element.getAttribute('marker-end') || element.getAttribute('marker-start')) {
+             break; // Stop looking this direction, it's an arrow
+          }
+
           if (removeInsteadOfHide) {
             element.remove();
           } else {
@@ -913,7 +949,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
             element.setAttribute('data-text-annotation', 'true');
           }
           break;
-        } else if (element && element.tagName !== 'line' && element.tagName !== 'g') {
+        } else if (element && element.tagName !== 'line' && element.tagName !== 'LINE' && element.tagName !== 'g' && element.tagName !== 'G') {
           break;
         }
       }
