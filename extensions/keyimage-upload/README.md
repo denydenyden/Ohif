@@ -7,11 +7,63 @@ OHIF extension for KeyImage upload with editor popup.
 - Capture viewport image with annotations
 - Edit image with text, arrows, and crop tools
 - Upload to server for DICOM CR KeyImage conversion
+- Loading indicator during upload
+- Success/Error notifications
 
 ## Usage
 
-The extension adds a "KeyImage Upload" button to the toolbar. Click it to open the editor popup.
+1. Click "KeyImage Upload" button in the toolbar to open the editor popup
+2. Use annotation tools (Text, Arrow) to mark up the image
+3. (Optional) Use Crop tool to select specific area to save
+4. Click "Сохранить KeyImage" to upload to server
+5. Wait for upload to complete (loading indicator shown)
+6. View success notification with SOP Instance UID
+
+## Tools Available
+
+- **Text** - Add text annotations
+- **Arrow** - Add arrow annotations
+- **Zoom** - Zoom in/out
+- **Pan** - Pan the image
+- **W/L** - Adjust window/level
+- **Crop** - Select area to crop (optional)
 
 ## Configuration
 
-Set `window.config.keyimageUploadUrl` to configure the upload endpoint (default: `/api/keyimage/upload`).
+Set `window.config.keyimageUploadUrl` in your config file:
+
+```javascript
+window.config = {
+  // ... other config
+  keyimageUploadUrl: 'https://your-server.com/api/keyimage/upload',
+};
+```
+
+## API Requirements
+
+The server endpoint must accept `multipart/form-data` POST requests with:
+
+- `image` (file, required) - PNG file with image and annotations
+- `study_iuid` (string, required) - Study Instance UID
+- `series_iuid` (string, optional) - Series Instance UID
+- `sop_iuid` (string, optional) - SOP Instance UID
+
+Expected response format:
+
+```json
+{
+  "status": "success",
+  "message": "KeyImage successfully created and uploaded to archive",
+  "sop_instance_uid": "1.2.826.0.1.3680043.2.1125.XXXX...",
+  "series_instance_uid": "1.2.826.0.1.3680043.2.1125.YYYY...",
+  "study_instance_uid": "1.2.840.113619.2.55.3.1234567890",
+  "stow_response": 201
+}
+```
+
+## Implementation Details
+
+- Crop tool uses `RectangleROI` from Cornerstone3D
+- Crop annotations are automatically removed after successful save
+- PNG export includes all annotations except crop rectangle
+- Viewport settings (zoom, pan, window/level) are synchronized with main viewer

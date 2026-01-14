@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, Suspense, useState, useCallback } from 'react';
 import { getEnabledElement, StackViewport } from '@cornerstonejs/core';
-import { ToolGroupManager } from '@cornerstonejs/tools';
-import { ToolButton } from '@ohif/ui-next';
+import { ToolGroupManager, annotation as annotationModule } from '@cornerstonejs/tools';
+import { ToolButton, Icons } from '@ohif/ui-next';
 import ToolButtonListWrapper from '@ohif/extension-default/src/Toolbar/ToolButtonListWrapper';
 import { useToolbar } from '@ohif/core/src/hooks/useToolbar';
 import type { Types } from '@ohif/core';
@@ -41,6 +41,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   const { cornerstoneViewportService, toolGroupService, viewportGridService, toolbarService } =
     servicesManager.services;
   const [activeTool, setActiveTool] = useState<string>('WindowLevel');
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const isSavingTextAnnotationRef = useRef<boolean>(false);
 
   // Track when text annotation is being saved to prevent modal closing
@@ -357,7 +358,61 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     });
   };
 
+  // Get crop area from RectangleROI annotation
+  const getCropArea = (): { x: number; y: number; width: number; height: number } | null => {
+    try {
+      const popupElement = document.querySelector(
+        `[data-viewportid="${POPUP_VIEWPORT_ID}"]`
+      ) as HTMLElement;
+
+      if (!popupElement) return null;
+
+      const enabledElement = getEnabledElement(popupElement as any);
+      if (!enabledElement) return null;
+
+      // Get all RectangleROI annotations for viewport
+      const annotations = annotationModule.state.getAnnotations(
+        'RectangleROI',
+        enabledElement.FrameOfReferenceUID
+      );
+
+      if (!annotations || annotations.length === 0) return null;
+
+      // Take the last created annotation (most recent)
+      const rectangleAnnotation = annotations[annotations.length - 1];
+
+      if (!rectangleAnnotation?.data?.handles?.points) return null;
+
+      const points = rectangleAnnotation.data.handles.points;
+      const viewport = enabledElement.viewport as StackViewport;
+
+      // Convert world coordinates to canvas coordinates
+      const canvasPoints = points.map(point => viewport.worldToCanvas(point));
+
+      // Calculate bounding box
+      const xs = canvasPoints.map(p => p[0]);
+      const ys = canvasPoints.map(p => p[1]);
+
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      };
+    } catch (error) {
+      console.error('[KeyImage] Error getting crop area:', error);
+      return null;
+    }
+  };
+
   const handleSave = async () => {
+    setIsUploading(true);
+
     try {
       // Get popup viewport element
       const popupElement = document.querySelector(
@@ -424,14 +479,35 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       const pngBlob = await convertCanvasToPNG(canvas, svgLayer);
 
       // Send to server
-      await sendKeyImageToServer(pngBlob, metadata);
+      const response = await sendKeyImageToServer(pngBlob, metadata);
+
+      // Remove RectangleROI annotation after successful save
+      try {
+        const enabledElement = getEnabledElement(popupElement as any);
+        if (enabledElement) {
+          const annotations = annotationModule.state.getAnnotations(
+            'RectangleROI',
+            enabledElement.FrameOfReferenceUID
+          );
+
+          if (annotations && annotations.length > 0) {
+            annotations.forEach(ann => {
+              annotationModule.state.removeAnnotation(ann.annotationUID);
+            });
+            enabledElement.viewport.render();
+          }
+        }
+      } catch (e) {
+        console.warn('[KeyImage] Error removing crop annotation:', e);
+      }
 
       // Show success notification
       const { uiNotificationService } = servicesManager.services;
       uiNotificationService.show({
         title: 'Success',
-        message: 'KeyImage saved successfully!',
+        message: `KeyImage saved successfully! SOP UID: ${response.sop_instance_uid || 'N/A'}`,
         type: 'success',
+        duration: 5000,
       });
 
       // Don't close popup automatically - let user close it manually
@@ -442,7 +518,10 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
         title: 'Error',
         message: error instanceof Error ? error.message : 'Failed to save KeyImage',
         type: 'error',
+        duration: 8000,
       });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -452,21 +531,24 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   ): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       try {
+        const cropArea = getCropArea(); // Get crop area if exists
+
         const canvasRect = canvas.getBoundingClientRect();
         const displayedWidth = Math.round(canvasRect.width);
         const displayedHeight = Math.round(canvasRect.height);
 
-        let width = displayedWidth;
-        let height = displayedHeight;
-        let offsetX = 0;
-        let offsetY = 0;
+        // If crop area exists - use it, otherwise use full canvas
+        let width = cropArea ? Math.round(cropArea.width) : displayedWidth;
+        let height = cropArea ? Math.round(cropArea.height) : displayedHeight;
+        let offsetX = cropArea ? Math.round(cropArea.x) : 0;
+        let offsetY = cropArea ? Math.round(cropArea.y) : 0;
         const padding = 5;
 
         const scaleX = displayedWidth / canvas.width;
         const scaleY = displayedHeight / canvas.height;
 
-        // Check if SVG annotations extend beyond canvas
-        if (svgLayer && svgLayer.children.length > 0) {
+        // Check if SVG annotations extend beyond canvas (only if not in crop mode)
+        if (!cropArea && svgLayer && svgLayer.children.length > 0) {
           const svgBBox = getSVGBoundingBox(svgLayer, canvas);
           if (svgBBox) {
             const displayedMinX = svgBBox.minX * scaleX;
@@ -505,20 +587,50 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, width, height);
 
-        ctx.drawImage(
-          canvas,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
-          offsetX,
-          offsetY,
-          displayedWidth,
-          displayedHeight
-        );
+        // Draw canvas with crop support
+        if (cropArea) {
+          // Crop mode: draw only selected area
+          const canvasScaleX = canvas.width / displayedWidth;
+          const canvasScaleY = canvas.height / displayedHeight;
+
+          ctx.drawImage(
+            canvas,
+            cropArea.x * canvasScaleX,
+            cropArea.y * canvasScaleY,
+            cropArea.width * canvasScaleX,
+            cropArea.height * canvasScaleY,
+            0,
+            0,
+            width,
+            height
+          );
+        } else {
+          // Normal mode: draw full canvas
+          ctx.drawImage(
+            canvas,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+            offsetX,
+            offsetY,
+            displayedWidth,
+            displayedHeight
+          );
+        }
 
         if (svgLayer && svgLayer.children.length > 0) {
           const svgClone = svgLayer.cloneNode(true) as SVGElement;
+          
+          // Remove RectangleROI annotations (crop tool) from export
+          const allGroups = svgClone.querySelectorAll('g');
+          allGroups.forEach(group => {
+            const dataId = group.getAttribute('data-id');
+            if (dataId && dataId.includes('RectangleROI')) {
+              group.remove();
+            }
+          });
+          
           processTextAnnotationsInPopup(svgClone, true);
           applyWhiteSolidStyles(svgClone);
 
@@ -530,8 +642,15 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           svgClone.setAttribute('width', String(svgExportWidth));
           svgClone.setAttribute('height', String(svgExportHeight));
 
-          const viewBoxX = offsetX === 0 ? 0 : -offsetX;
-          const viewBoxY = offsetY === 0 ? 0 : -offsetY;
+          let viewBoxX = offsetX === 0 ? 0 : -offsetX;
+          let viewBoxY = offsetY === 0 ? 0 : -offsetY;
+          
+          // Adjust viewBox for crop mode
+          if (cropArea) {
+            viewBoxX = cropArea.x;
+            viewBoxY = cropArea.y;
+          }
+          
           svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${width} ${height}`);
           svgClone.setAttribute('preserveAspectRatio', 'none');
 
@@ -773,9 +892,13 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     const formData = new FormData();
     formData.append('image', pngBlob, 'keyimage.png');
 
-    if (metadata.studyInstanceUID) {
-      formData.append('study_iuid', metadata.studyInstanceUID);
+    // Study Instance UID is required
+    if (!metadata.studyInstanceUID) {
+      throw new Error('Study Instance UID is required for KeyImage upload');
     }
+
+    formData.append('study_iuid', metadata.studyInstanceUID);
+
     if (metadata.seriesInstanceUID) {
       formData.append('series_iuid', metadata.seriesInstanceUID);
     }
@@ -784,6 +907,9 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     }
 
     const uploadUrl = (window as any).config?.keyimageUploadUrl || '/api/keyimage/upload';
+
+    console.log('[KeyImage] Uploading to:', uploadUrl);
+    console.log('[KeyImage] Metadata:', metadata);
 
     const response = await fetch(uploadUrl, {
       method: 'POST',
@@ -801,10 +927,16 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           errorDetail = errorText.substring(0, 200);
         }
       }
-      throw new Error(errorDetail);
+      throw new Error(`Upload error: ${errorDetail}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+
+    if (result.status !== 'success') {
+      throw new Error(result.message || 'Unknown error during upload');
+    }
+
+    return result;
   };
 
   if (!displaySets || displaySets.length === 0) {
@@ -851,16 +983,43 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           onInteraction={() => handleToolActivation('WindowLevel')}
         />
 
+        {/* Crop Tool - only for KeyImage popup */}
+        <div className="border-l border-[#333] pl-2 ml-2">
+          <ToolButton
+            id="RectangleROI"
+            icon="tool-rectangle"
+            label="Crop"
+            tooltip="Select Area to Crop"
+            isActive={activeTool === 'RectangleROI'}
+            onInteraction={() => handleToolActivation('RectangleROI')}
+          />
+        </div>
+
         {/* Action Buttons */}
         <div className="ml-auto">
           <button
             onClick={handleSave}
+            disabled={isUploading}
             className="focus-visible:ring-ring bg-primary/60 text-primary-foreground hover:bg-primary/100 inline-flex h-7 min-w-[80px] items-center justify-center whitespace-nowrap rounded px-2 py-2 text-base font-normal leading-tight transition-colors focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none disabled:opacity-50"
           >
-            Save KeyImage
+            {isUploading ? (
+              <>
+                <Icons.LoadingSpinner className="mr-2 h-4 w-4" />
+                Saving...
+              </>
+            ) : (
+              'Save KeyImage'
+            )}
           </button>
         </div>
       </div>
+
+      {/* Hint for Crop tool */}
+      {activeTool === 'RectangleROI' && (
+        <div className="mb-2 rounded bg-primary/20 px-3 py-2 text-sm text-white">
+          💡 Draw a rectangle on the image to select the area to save
+        </div>
+      )}
 
       {/* Cornerstone Viewport */}
       <div
@@ -889,6 +1048,16 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           />
         </Suspense>
       </div>
+
+      {/* Loading Overlay */}
+      {isUploading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="flex flex-col items-center space-y-4">
+            <Icons.LoadingSpinner className="h-12 w-12 text-white" />
+            <p className="text-white text-lg">Saving KeyImage...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
