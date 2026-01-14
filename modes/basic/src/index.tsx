@@ -73,6 +73,7 @@ export const segmentation = {
 };
 
 export const extensionDependencies = {
+  '@ohif/extension-keyimage-upload': '^3.12.0-beta.121',
   // Can derive the versions at least process.env.from npm_package_version
   '@ohif/extension-default': '^3.0.0',
   '@ohif/extension-cornerstone': '^3.0.0',
@@ -216,6 +217,7 @@ export const toolbarSections = {
     'TrackballRotate',
     'WindowLevel',
     'Capture',
+    'KeyImageUpload',
     'Layout',
     'Crosshairs',
     'MoreTools',

@@ -643,6 +643,23 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'KeyImageUpload',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-capture',
+      label: i18n.t('Buttons:KeyImage Upload'),
+      tooltip: i18n.t('Buttons:KeyImage Upload'),
+      commands: 'openKeyImageEditor',
+      evaluate: [
+        'evaluate.action',
+        {
+          name: 'evaluate.viewport.supported',
+          unsupportedViewportTypes: ['video', 'wholeSlide'],
+        },
+      ],
+    },
+  },
+  {
     id: 'Layout',
     uiType: 'ohif.layoutSelector',
     props: {

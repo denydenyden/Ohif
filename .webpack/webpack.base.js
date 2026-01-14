@@ -201,6 +201,8 @@ module.exports = (env, argv, { SRC_DIR, ENTRY }) => {
         '@hooks': path.resolve(__dirname, '../platform/app/src/hooks'),
         '@routes': path.resolve(__dirname, '../platform/app/src/routes'),
         '@state': path.resolve(__dirname, '../platform/app/src/state'),
+        // Extensions
+        '@ohif/extension-keyimage-upload': path.resolve(__dirname, '../extensions/keyimage-upload/src/index'),
       },
       // Which directories to search when resolving modules
       modules: [
@@ -210,6 +212,8 @@ module.exports = (env, argv, { SRC_DIR, ENTRY }) => {
         path.resolve(__dirname, '../../../node_modules'),
         path.resolve(__dirname, '../platform/app/node_modules'),
         path.resolve(__dirname, '../platform/ui/node_modules'),
+        // Extensions directory
+        path.resolve(__dirname, '../extensions'),
         SRC_DIR,
       ],
       // Attempt to resolve these extensions in order.

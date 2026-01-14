@@ -65,6 +65,10 @@
     {
       "packageName": "@ohif/extension-ultrasound-pleura-bline",
       "version": "3.0.0"
+    },
+    {
+      "packageName": "@ohif/extension-keyimage-upload",
+      "version": "3.12.0-beta.121"
     }
   ],
   "modes": [
