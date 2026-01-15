@@ -305,7 +305,7 @@ class TextTool extends ArrowAnnotateTool {
         textBoxOptions
       );
 
-      // Save boundingBox and update center if needed
+      // Save boundingBox
       if (boundingBox && data.handles.textBox) {
         const { x: left, y: top, width, height } = boundingBox;
 
@@ -317,17 +317,10 @@ class TextTool extends ArrowAnnotateTool {
           bottomRight: viewport.canvasToWorld([left + width, top + height]),
         };
 
-        // Calculate actual text center and update worldPosition
-        // This is needed for accuracy, as actual size may differ slightly
-        const centerX = left + width / 2;
-        const centerY = top + height / 2;
-        const centerCanvas: Types.Point2 = [centerX, centerY];
-        const actualCenterWorld = viewport.canvasToWorld(centerCanvas);
-
-        // Update center only if not set or text changed
-        if (!data.handles.textBox.worldPosition || data.handles.textBox.cachedText !== currentText) {
-          data.handles.textBox.worldPosition = actualCenterWorld;
-        }
+        // Note: We deliberately do NOT update data.handles.textBox.worldPosition here
+        // We want the anchor to remain strictly at the user's click point (or where dragged)
+        // Updating it based on the rendered box center can cause drift or "top-left" anchoring artifacts
+        // if the text size changes (e.g. initial empty string vs typed text).
       }
     }
 
