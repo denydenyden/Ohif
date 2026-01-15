@@ -119,10 +119,15 @@ export default function initCornerstoneTools(configuration = {}) {
   addTool(SculptorTool);
   addTool(SplineContourSegmentationTool);
   addTool(LabelMapEditWithContourTool);
+  // Read user preferences for annotation styles
+  const fontSize = Number(localStorage.getItem('ohif-annotation-font-size')) || 14;
+  const lineWidth = Number(localStorage.getItem('ohif-annotation-line-width')) || 2.5;
+
   // Modify annotation tools to use white color, solid lines, and black borders
   const annotationStyle = {
-    textBoxFontSize: '40px',
-    lineWidth: '1.5',
+    textBoxFontSize: `${fontSize}px`,
+    lineWidth: lineWidth, // Number, not string
+    lineShadow: true, // Enable shadow for better visibility
     color: 'rgb(255, 255, 255)',
     textBoxColor: 'rgb(255, 255, 255)',
     lineDash: '',

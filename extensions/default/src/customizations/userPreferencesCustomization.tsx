@@ -54,6 +54,8 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
   const [state, setState] = useState({
     hotkeyDefinitions: initialHotkeyDefinitions,
     languageValue: currentLanguage.value,
+    annotationFontSize: Number(localStorage.getItem('ohif-annotation-font-size')) || 14,
+    annotationLineWidth: Number(localStorage.getItem('ohif-annotation-line-width')) || 2.5,
   });
 
   const onLanguageChangeHandler = (value: string) => {
@@ -78,6 +80,8 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
       ...state,
       languageValue: defaultLanguage.value,
       hotkeyDefinitions: resolvedHotkeyDefaults,
+      annotationFontSize: 14,
+      annotationLineWidth: 2.5,
     }));
 
     hotkeysManager.restoreDefaultBindings();
@@ -114,7 +118,9 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
             return localized.charAt(0).toUpperCase() + localized.slice(1);
           }
         } catch (error) {
+          // Invalid language code, use fallback
           console.debug(`Unable to resolve display name for ${languageValue}`, error);
+          return fallbackLabel;
         }
       }
 
@@ -152,6 +158,58 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
           </Select>
         </div>
 
+        {/* Annotation Settings Section */}
+         <div className="mb-6 border-t border-secondary-light pt-4">
+          <UserPreferencesModal.SubHeading className="mb-4 block">{t('Annotation Settings')}</UserPreferencesModal.SubHeading>
+          <div className="flex gap-8">
+            <div className="flex flex-col gap-2">
+              <label className="text-white text-sm">
+                {t('Font Size')}
+              </label>
+              <Select
+                value={String(state.annotationFontSize)}
+                onValueChange={(value) => {
+                  setState(prev => ({ ...prev, annotationFontSize: Number(value) }));
+                }}
+              >
+                <SelectTrigger className="w-40">
+                  {state.annotationFontSize}px
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px] overflow-y-auto">
+                  {[...new Set([10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 48, 60, state.annotationFontSize])]
+                    .sort((a, b) => a - b)
+                    .map(size => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}px
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-white text-sm">
+                 {t('Line Style')}
+              </label>
+              <Select
+                value={state.annotationLineWidth === 1.5 ? 'small' : state.annotationLineWidth === 2.5 ? 'medium' : 'large'}
+                onValueChange={(value) => {
+                  const widthMap = { small: 1.5, medium: 2.5, large: 3.5 };
+                  setState(prev => ({ ...prev, annotationLineWidth: widthMap[value] }));
+                }}
+              >
+                <SelectTrigger className="w-40">
+                  {state.annotationLineWidth === 1.5 ? t('Small') : state.annotationLineWidth === 2.5 ? t('Medium') : t('Large')}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">{t('Small')}</SelectItem>
+                  <SelectItem value="medium">{t('Medium')}</SelectItem>
+                  <SelectItem value="large">{t('Large')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
         <UserPreferencesModal.SubHeading>{t('Hotkeys')}</UserPreferencesModal.SubHeading>
         <UserPreferencesModal.HotkeysGrid>
           {Object.entries(state.hotkeyDefinitions).map(([id, definition]) => (
@@ -186,10 +244,21 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
             onClick={() => {
               if (state.languageValue !== currentLanguage.value) {
                 i18n.changeLanguage(state.languageValue);
+                // Save annotation settings before reload
+                localStorage.setItem('ohif-annotation-font-size', String(state.annotationFontSize));
+                localStorage.setItem('ohif-annotation-line-width', String(state.annotationLineWidth));
+                window.dispatchEvent(new Event('annotation-settings-changed'));
+
                 // Force page reload after language change to ensure all translations are applied
                 window.location.reload();
                 return; // Exit early since we're reloading
               }
+
+              // Save annotation settings
+              localStorage.setItem('ohif-annotation-font-size', String(state.annotationFontSize));
+              localStorage.setItem('ohif-annotation-line-width', String(state.annotationLineWidth));
+              window.dispatchEvent(new Event('annotation-settings-changed'));
+
               hotkeysManager.setHotkeys(state.hotkeyDefinitions);
               hotkeysModule.stopRecord();
               hotkeysModule.unpause();

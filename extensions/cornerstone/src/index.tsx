@@ -121,6 +121,44 @@ const cornerstoneExtension: Types.Extensions.Extension = {
       cornerstoneTools.Enums.Events.TOOL_ACTIVATED,
     ]);
 
+    // Listen for annotation settings changes and update Cornerstone defaults
+    const updateAnnotationDefaults = () => {
+      const fontSize = Number(localStorage.getItem('ohif-annotation-font-size')) || 14;
+      const lineWidth = Number(localStorage.getItem('ohif-annotation-line-width')) || 2.5;
+
+      // Update CSS variables for global styling
+      const root = document.documentElement;
+      root.style.setProperty('--annotation-line-width', `${lineWidth}px`);
+      root.style.setProperty('--annotation-font-size', `${fontSize}px`);
+
+      const annotationStyle = {
+        textBoxFontSize: `${fontSize}px`,
+        lineWidth: lineWidth, // Number, not string
+        lineShadow: true, // Enable shadow for better visibility
+        color: 'rgb(255, 255, 255)',
+        textBoxColor: 'rgb(255, 255, 255)',
+        lineDash: '',
+      };
+
+      const defaultStyles = cornerstoneTools.annotation.config.style.getDefaultToolStyles();
+      cornerstoneTools.annotation.config.style.setDefaultToolStyles({
+        global: {
+          ...defaultStyles.global,
+          ...annotationStyle,
+        },
+      });
+
+      console.log('[Cornerstone] Updated default annotation styles and CSS variables:', { fontSize, lineWidth });
+    };
+
+    // Initial update of CSS variables
+    updateAnnotationDefaults();
+
+    window.addEventListener('annotation-settings-changed', updateAnnotationDefaults);
+    unsubscriptions.push(() => {
+      window.removeEventListener('annotation-settings-changed', updateAnnotationDefaults);
+    });
+
     // Configure the interleaved/HTJ2K loader
     imageRetrieveMetadataProvider.clear();
     // The default volume interleaved options are to interleave the

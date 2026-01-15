@@ -45,6 +45,12 @@
   -ms-user-select: none;
 }
 
+/* CSS variables for annotation styles - can be updated dynamically */
+:root {
+  --annotation-line-width: 2.5px;
+  --annotation-font-size: 14px;
+}
+
 /* Белые линии с черной обводкой для всех SVG элементов аннотаций */
 .cornerstone-viewport-element svg line,
 .cornerstone-viewport-element svg polyline,
@@ -57,9 +63,15 @@
 .viewport-wrapper svg path:not([d='']),
 .viewport-wrapper svg ellipse,
 .viewport-wrapper svg circle,
-.viewport-wrapper svg polygon {
+.viewport-wrapper svg polygon,
+svg.svg-layer line,
+svg.svg-layer polyline,
+svg.svg-layer path:not([d='']),
+svg.svg-layer ellipse,
+svg.svg-layer circle,
+svg.svg-layer polygon {
   stroke: #ffffff !important;
-  stroke-width: 2px !important;
+  stroke-width: var(--annotation-line-width) !important;
   stroke-dasharray: none !important;
   stroke-dashoffset: 0 !important;
   fill: none !important;
@@ -81,9 +93,11 @@
 .cornerstone-viewport-element svg path[id*='arrow'],
 .cornerstone-viewport-element svg polygon[id*='arrow'],
 .viewport-wrapper svg path[id*='arrow'],
-.viewport-wrapper svg polygon[id*='arrow'] {
+.viewport-wrapper svg polygon[id*='arrow'],
+svg.svg-layer path[id*='arrow'],
+svg.svg-layer polygon[id*='arrow'] {
   stroke: #ffffff !important;
-  stroke-width: 2px !important;
+  stroke-width: var(--annotation-line-width) !important;
   stroke-dasharray: none !important;
   stroke-dashoffset: 0 !important;
   fill: none !important;

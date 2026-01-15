@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, Suspense, useState, useCallback } from 'react';
 import { getEnabledElement, StackViewport } from '@cornerstonejs/core';
 import { ToolGroupManager, annotation as annotationModule } from '@cornerstonejs/tools';
-import { ToolButton, Icons } from '@ohif/ui-next';
+import { ToolButton, Icons, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@ohif/ui-next';
 import ToolButtonListWrapper from '@ohif/extension-default/src/Toolbar/ToolButtonListWrapper';
 import { useToolbar } from '@ohif/core/src/hooks/useToolbar';
 import type { Types } from '@ohif/core';
@@ -42,6 +42,12 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   const { cornerstoneViewportService, toolGroupService, viewportGridService, toolbarService } =
     servicesManager.services;
   const [activeTool, setActiveTool] = useState<string>('WindowLevel');
+  const [annotationFontSize, setAnnotationFontSize] = useState<number>(
+    Number(localStorage.getItem('ohif-annotation-font-size')) || 14
+  );
+  const [annotationLineWidth, setAnnotationLineWidth] = useState<number>(
+    Number(localStorage.getItem('ohif-annotation-line-width')) || 2.5
+  );
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [cropArea, setCropArea] = useState<{
     x: number;
@@ -57,6 +63,38 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     originalCrop: { x: number; y: number; width: number; height: number };
   } | null>(null);
   const isSavingTextAnnotationRef = useRef<boolean>(false);
+
+  // Sync with global settings
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      setAnnotationFontSize(Number(localStorage.getItem('ohif-annotation-font-size')) || 14);
+      setAnnotationLineWidth(Number(localStorage.getItem('ohif-annotation-line-width')) || 2.5);
+    };
+
+    window.addEventListener('annotation-settings-changed', handleSettingsChange);
+    return () => {
+      window.removeEventListener('annotation-settings-changed', handleSettingsChange);
+    };
+  }, []);
+
+  const handleFontSizeChange = (value: string) => {
+    const newSize = Number(value);
+    if (!isNaN(newSize)) {
+      setAnnotationFontSize(newSize);
+      localStorage.setItem('ohif-annotation-font-size', String(newSize));
+      window.dispatchEvent(new Event('annotation-settings-changed'));
+    }
+  };
+
+  const handleLineWidthChange = (value: string) => {
+    const widthMap = { small: 1.5, medium: 2.5, large: 3.5 };
+    const newWidth = widthMap[value];
+    if (newWidth) {
+      setAnnotationLineWidth(newWidth);
+      localStorage.setItem('ohif-annotation-line-width', String(newWidth));
+      window.dispatchEvent(new Event('annotation-settings-changed'));
+    }
+  };
 
   // Helper to determine cursor style
   const getCursorStyle = (handle: string) => {
@@ -125,11 +163,6 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           }
         : null);
 
-    // If implementing create visualization differently (calculating current rect from start drag), pass it in or calculate it.
-    // For 'create' mode, we usually calculate current rect from start position and current mouse position.
-    // Since drawCropOverlay is called from effect dependent on cropArea, passing dynamic create rect is tricky without state.
-    // Let's rely on setCropArea being called during create drag for smooth updates.
-
     if (!crop) return;
 
     // Draw dark overlay outside crop area
@@ -138,12 +171,6 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
 
     // Clear the crop area (make it transparent)
     ctx.clearRect(crop.x, crop.y, crop.width, crop.height);
-
-    // Re-draw the semi-transparent black around the crop area explicitly to ensure clean edges (optional, but 'clearRect' on transparent canvas works)
-    // Actually, clearRect on a filled canvas makes a hole. Since we want an overlay, the hole is perfect.
-
-    // Wait, if I fill everything, I lose the underlying image behind the canvas?
-    // No, the canvas is on top. So clearing the rect reveals the image below. Correct.
 
     // Draw crop border
     ctx.strokeStyle = 'rgb(94, 129, 244)'; // Blue matching Save button
@@ -333,11 +360,8 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           ...toolbarService.state,
         });
       }
-
-      // Don't remove buttons - they are used in main toolbar too
-      // The buttons Text and ArrowAnnotate are already registered in main toolbar
     };
-  }, [toolbarService, toolGroupId]);
+  }, [toolbarService, toolGroupId, commandsManager]);
 
   // Cleanup: Remove popup viewport from toolGroup and disable it when component unmounts
   useEffect(() => {
@@ -517,7 +541,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     };
   }, [displaySets, activeViewportId]);
 
-  // Handler for tool activation
+  // Handle tool activation
   const handleToolActivation = (toolName: string) => {
     // Special handling for Crop tool (custom implementation)
     if (toolName === 'Crop') {
@@ -547,6 +571,8 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       toolGroupIds: [toolGroupId],
     });
   };
+
+  // Handle crop canvas mouse events
 
 
   // Handle crop canvas mouse events
@@ -1102,16 +1128,19 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   const applyWhiteSolidStyles = (svgElement: SVGElement) => {
     if (!svgElement) return;
 
+    // Read user preference for line width
+    const lineWidth = Number(localStorage.getItem('ohif-annotation-line-width')) || 2;
+
     const lineElements = svgElement.querySelectorAll(
       'line, path, polyline, polygon, circle, ellipse, rect'
     );
     lineElements.forEach(el => {
       el.setAttribute('stroke', '#ffffff');
-      el.setAttribute('stroke-width', '2');
+      el.setAttribute('stroke-width', String(lineWidth));
       el.removeAttribute('stroke-dasharray');
       el.removeAttribute('stroke-dashoffset');
       (el as HTMLElement).style.setProperty('stroke', '#ffffff', 'important');
-      (el as HTMLElement).style.setProperty('stroke-width', '2px', 'important');
+      (el as HTMLElement).style.setProperty('stroke-width', `${lineWidth}px`, 'important');
       (el as HTMLElement).style.setProperty('stroke-dasharray', 'none', 'important');
       (el as HTMLElement).style.setProperty('stroke-dashoffset', '0', 'important');
       (el as HTMLElement).style.setProperty(
@@ -1139,21 +1168,12 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   const increaseAnnotationFontSize = (svgElement: SVGElement) => {
     if (!svgElement) return;
 
+    // Read user preference for font size
+    const fontSize = Number(localStorage.getItem('ohif-annotation-font-size')) || 14;
+
     const textElements = svgElement.querySelectorAll('text');
     textElements.forEach(textEl => {
-      const currentSize = textEl.getAttribute('font-size');
-      if (currentSize) {
-        const sizeMatch = currentSize.match(/(\d+(?:\.\d+)?)/);
-        if (sizeMatch) {
-          const baseSize = parseFloat(sizeMatch[1]);
-          const newSize = Math.round(baseSize * 1.8);
-          textEl.setAttribute('font-size', String(newSize));
-        } else {
-          textEl.setAttribute('font-size', '1.8em');
-        }
-      } else {
-        textEl.setAttribute('font-size', '1.8em');
-      }
+      textEl.setAttribute('font-size', `${fontSize}px`);
     });
   };
 
@@ -1217,7 +1237,10 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   }
 
   return (
-    <div className="box-border flex h-full w-full flex-col overflow-hidden rounded-lg bg-[#1a1a1a] p-5 shadow-lg">
+    <div className="relative box-border flex h-full w-full flex-col overflow-hidden rounded-lg bg-[#1a1a1a] p-5 shadow-lg">
+      {/* Settings Panel */}
+      {/* Settings Panel Removed */}
+
       {/* Toolbar */}
       <div className="mb-4 flex items-center gap-2 border-b border-[#333] pb-4">
         {/* Measurement Tools with Dropdown - same as main toolbar */}
@@ -1263,6 +1286,45 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
             onInteraction={() => handleToolActivation('Crop')}
           />
         </div>
+
+        {/* Annotation Controls */}
+        <div className="ml-2 flex items-center gap-2 border-l border-[#333] pl-2">
+          <Select
+            value={String(annotationFontSize)}
+            onValueChange={handleFontSizeChange}
+          >
+            <SelectTrigger className="border-secondary-light h-[26px] w-[110px] bg-black text-[13px] text-white">
+              {annotationFontSize}px
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px] overflow-y-auto">
+              {[...new Set([10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 48, 60, annotationFontSize])]
+                .sort((a, b) => a - b)
+                .map(size => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}px
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={
+              annotationLineWidth === 1.5 ? 'small' :
+              annotationLineWidth === 2.5 ? 'medium' : 'large'
+            }
+            onValueChange={handleLineWidthChange}
+          >
+            <SelectTrigger className="border-secondary-light h-[26px] w-[110px] bg-black text-[13px] text-white">
+              {annotationLineWidth === 1.5 ? 'Thin' : annotationLineWidth === 2.5 ? 'Medium' : 'Thick'}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">Thin</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="large">Thick</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
 
         {/* Action Buttons */}
         <div className="ml-auto">
