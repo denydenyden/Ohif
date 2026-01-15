@@ -49,9 +49,59 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     width: number;
     height: number;
   } | null>(null);
-  const [isDrawingCrop, setIsDrawingCrop] = useState<boolean>(false);
-  const cropStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [dragState, setDragState] = useState<{
+    type: 'create' | 'move' | 'resize';
+    handle?: string; // 'nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'
+    startX: number;
+    startY: number;
+    originalCrop: { x: number; y: number; width: number; height: number };
+  } | null>(null);
   const isSavingTextAnnotationRef = useRef<boolean>(false);
+
+  // Helper to determine cursor style
+  const getCursorStyle = (handle: string) => {
+    switch (handle) {
+      case 'nw':
+      case 'se':
+        return 'nwse-resize';
+      case 'ne':
+      case 'sw':
+        return 'nesw-resize';
+      case 'n':
+      case 's':
+        return 'ns-resize';
+      case 'e':
+      case 'w':
+        return 'ew-resize';
+      case 'move':
+        return 'move';
+      default:
+        return 'crosshair';
+    }
+  };
+
+  // Helper to get handle at position
+  const getHandleAtPosition = (x: number, y: number, crop: { x: number; y: number; width: number; height: number }) => {
+    const handleSize = 10;
+    const { x: cx, y: cy, width: cw, height: ch } = crop;
+
+    // Check corners
+    if (Math.abs(x - cx) <= handleSize && Math.abs(y - cy) <= handleSize) return 'nw';
+    if (Math.abs(x - (cx + cw)) <= handleSize && Math.abs(y - cy) <= handleSize) return 'ne';
+    if (Math.abs(x - cx) <= handleSize && Math.abs(y - (cy + ch)) <= handleSize) return 'sw';
+    if (Math.abs(x - (cx + cw)) <= handleSize && Math.abs(y - (cy + ch)) <= handleSize) return 'se';
+
+    // Check edges
+    if (Math.abs(y - cy) <= handleSize && x >= cx && x <= cx + cw) return 'n';
+    if (Math.abs(y - (cy + ch)) <= handleSize && x >= cx && x <= cx + cw) return 's';
+    if (Math.abs(x - cx) <= handleSize && y >= cy && y <= cy + ch) return 'w';
+    if (Math.abs(x - (cx + cw)) <= handleSize && y >= cy && y <= cy + ch) return 'e';
+
+    // Check inside
+    if (x > cx && x < cx + cw && y > cy && y < cy + ch) return 'move';
+
+    return null;
+  };
 
   // Draw crop overlay on canvas
   const drawCropOverlay = useCallback(() => {
@@ -66,54 +116,66 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
 
     const crop =
       cropArea ||
-      (isDrawingCrop && cropStartRef.current
+      (dragState?.type === 'create'
         ? {
-            x: Math.min(cropStartRef.current.x, cropStartRef.current.x),
-            y: Math.min(cropStartRef.current.y, cropStartRef.current.y),
+            x: Math.min(dragState.startX, dragState.startX), // simplified for now, will calculate in realtime during create
+            y: Math.min(dragState.startY, dragState.startY),
             width: 0,
             height: 0,
           }
         : null);
 
+    // If implementing create visualization differently (calculating current rect from start drag), pass it in or calculate it.
+    // For 'create' mode, we usually calculate current rect from start position and current mouse position.
+    // Since drawCropOverlay is called from effect dependent on cropArea, passing dynamic create rect is tricky without state.
+    // Let's rely on setCropArea being called during create drag for smooth updates.
+
     if (!crop) return;
 
     // Draw dark overlay outside crop area
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill all first
 
-    // Top
-    ctx.fillRect(0, 0, canvas.width, crop.y);
-    // Bottom
-    ctx.fillRect(0, crop.y + crop.height, canvas.width, canvas.height - (crop.y + crop.height));
-    // Left
-    ctx.fillRect(0, crop.y, crop.x, crop.height);
-    // Right
-    ctx.fillRect(crop.x + crop.width, crop.y, canvas.width - (crop.x + crop.width), crop.height);
+    // Clear the crop area (make it transparent)
+    ctx.clearRect(crop.x, crop.y, crop.width, crop.height);
 
-    // Draw crop border - dashed blue line
+    // Re-draw the semi-transparent black around the crop area explicitly to ensure clean edges (optional, but 'clearRect' on transparent canvas works)
+    // Actually, clearRect on a filled canvas makes a hole. Since we want an overlay, the hole is perfect.
+
+    // Wait, if I fill everything, I lose the underlying image behind the canvas?
+    // No, the canvas is on top. So clearing the rect reveals the image below. Correct.
+
+    // Draw crop border
     ctx.strokeStyle = 'rgb(94, 129, 244)'; // Blue matching Save button
     ctx.lineWidth = 2;
     ctx.setLineDash([8, 4]); // Dashed pattern
     ctx.strokeRect(crop.x, crop.y, crop.width, crop.height);
     ctx.setLineDash([]); // Reset
 
-    // Draw resize handles (corners)
+    // Draw resize handles
     const handleSize = 8;
     ctx.fillStyle = 'rgb(94, 129, 244)';
-    const corners = [
-      { x: crop.x, y: crop.y }, // top-left
-      { x: crop.x + crop.width, y: crop.y }, // top-right
-      { x: crop.x, y: crop.y + crop.height }, // bottom-left
-      { x: crop.x + crop.width, y: crop.y + crop.height }, // bottom-right
+    const handles = [
+      { x: crop.x, y: crop.y }, // nw
+      { x: crop.x + crop.width / 2, y: crop.y }, // n
+      { x: crop.x + crop.width, y: crop.y }, // ne
+      { x: crop.x + crop.width, y: crop.y + crop.height / 2 }, // e
+      { x: crop.x + crop.width, y: crop.y + crop.height }, // se
+      { x: crop.x + crop.width / 2, y: crop.y + crop.height }, // s
+      { x: crop.x, y: crop.y + crop.height }, // sw
+      { x: crop.x, y: crop.y + crop.height / 2 }, // w
     ];
-    corners.forEach(corner => {
-      ctx.fillRect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
+
+    handles.forEach(handle => {
+      ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
     });
-  }, [cropArea, isDrawingCrop]);
+
+  }, [cropArea, dragState]);
 
   // Redraw crop overlay when crop area changes
   useEffect(() => {
     drawCropOverlay();
-  }, [cropArea, isDrawingCrop, drawCropOverlay]);
+  }, [cropArea, dragState, drawCropOverlay]);
 
   // Setup crop canvas size to match viewport
   useEffect(() => {
@@ -191,8 +253,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
 
     // Clean up crop state
     setCropArea(null);
-    setIsDrawingCrop(false);
-    cropStartRef.current = null;
+    setDragState(null);
 
     // Small delay to allow text input dialog to close first
     setTimeout(() => {
@@ -487,6 +548,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
     });
   };
 
+
   // Handle crop canvas mouse events
   const handleCropMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -499,18 +561,34 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // Clear existing crop and start new one
+      if (cropArea) {
+        const handle = getHandleAtPosition(x, y, cropArea);
+        if (handle) {
+          setDragState({
+            type: handle === 'move' ? 'move' : 'resize',
+            handle,
+            startX: x,
+            startY: y,
+            originalCrop: { ...cropArea },
+          });
+          return;
+        }
+      }
+
+      // If no handle hit or no crop area, start new creation
       setCropArea(null);
-      setIsDrawingCrop(true);
-      cropStartRef.current = { x, y };
+      setDragState({
+        type: 'create',
+        startX: x,
+        startY: y,
+        originalCrop: { x, y, width: 0, height: 0 },
+      });
     },
-    [activeTool]
+    [activeTool, cropArea]
   );
 
   const handleCropMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isDrawingCrop || !cropStartRef.current) return;
-
       const canvas = cropCanvasRef.current;
       if (!canvas) return;
 
@@ -518,28 +596,94 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      const startX = cropStartRef.current.x;
-      const startY = cropStartRef.current.y;
+        // Update cursor style if not dragging
+      if (!dragState && cropArea) {
+        const handle = getHandleAtPosition(x, y, cropArea);
+        canvas.style.cursor = handle ? getCursorStyle(handle) : 'crosshair';
+        return;
+      }
 
-      const newCrop = {
-        x: Math.min(startX, x),
-        y: Math.min(startY, y),
-        width: Math.abs(x - startX),
-        height: Math.abs(y - startY),
-      };
+      if (!dragState) {
+          canvas.style.cursor = 'crosshair';
+          return;
+      }
 
-      // Temporarily set crop for preview
-      setCropArea(newCrop);
+      // Handle Dragging
+      const dx = x - dragState.startX;
+      const dy = y - dragState.startY;
+
+      if (dragState.type === 'move') {
+        const newX = dragState.originalCrop.x + dx;
+        const newY = dragState.originalCrop.y + dy;
+
+        // Clamp to canvas bounds
+        const clampedX = Math.max(0, Math.min(newX, canvas.width - dragState.originalCrop.width));
+        const clampedY = Math.max(0, Math.min(newY, canvas.height - dragState.originalCrop.height));
+
+        setCropArea({
+          ...dragState.originalCrop,
+          x: clampedX,
+          y: clampedY,
+        });
+      } else if (dragState.type === 'resize') {
+          const { originalCrop, handle } = dragState;
+          let newX = originalCrop.x;
+          let newY = originalCrop.y;
+          let newWidth = originalCrop.width;
+          let newHeight = originalCrop.height;
+
+          // Horizontal Resize
+          if (handle?.includes('e')) {
+              newWidth = Math.max(10, originalCrop.width + dx);
+          } else if (handle?.includes('w')) {
+              const proposedWidth = originalCrop.width - dx;
+               if (proposedWidth > 10) {
+                  newX = originalCrop.x + dx;
+                  newWidth = proposedWidth;
+               }
+          }
+
+          // Vertical Resize
+          if (handle?.includes('s')) {
+              newHeight = Math.max(10, originalCrop.height + dy);
+          } else if (handle?.includes('n')) {
+              const proposedHeight = originalCrop.height - dy;
+              if (proposedHeight > 10) {
+                  newY = originalCrop.y + dy;
+                  newHeight = proposedHeight;
+              }
+          }
+
+          setCropArea({
+              x: newX,
+              y: newY,
+              width: newWidth,
+              height: newHeight,
+          });
+
+      } else if (dragState.type === 'create') {
+        const startX = dragState.startX;
+        const startY = dragState.startY;
+
+        const currentX = Math.max(0, Math.min(x, canvas.width));
+        const currentY = Math.max(0, Math.min(y, canvas.height));
+
+        const newCrop = {
+          x: Math.min(startX, currentX),
+          y: Math.min(startY, currentY),
+          width: Math.abs(currentX - startX),
+          height: Math.abs(currentY - startY),
+        };
+
+        setCropArea(newCrop);
+      }
     },
-    [isDrawingCrop]
+    [dragState, cropArea]
   );
 
   const handleCropMouseUp = useCallback(() => {
-    if (isDrawingCrop) {
-      setIsDrawingCrop(false);
-      cropStartRef.current = null;
-    }
-  }, [isDrawingCrop]);
+    setDragState(null);
+  }, []);
 
   const handleSave = async () => {
     setIsUploading(true);
@@ -614,8 +758,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
 
       // Clear crop area after successful save
       setCropArea(null);
-      setIsDrawingCrop(false);
-      cropStartRef.current = null;
+      setDragState(null);
 
       // Show success notification
       const { uiNotificationService } = servicesManager.services;
@@ -1113,7 +1256,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
         <div className="ml-2 border-l border-[#333] pl-2">
           <ToolButton
             id="Crop"
-            icon="tool-rectangle"
+            icon="tool-window-region"
             label="Crop"
             tooltip="Select Area to Crop"
             isActive={activeTool === 'Crop'}
