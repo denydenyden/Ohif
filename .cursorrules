@@ -75,3 +75,9 @@ Keep entries brief and focused on what matters for future context.
   Text/Arrow tools, Zoom/Pan/WL navigation, synchronized annotations with main viewer. Prevents
   popup closing when saving text annotations, synchronizes camera/zoom/pan/window-level between
   viewports for coordinate alignment.
+- KeyImage Save functionality: custom Crop tool with independent canvas overlay (not Cornerstone
+  annotation), dashed blue line with dark overlay and corner handles, PNG conversion with
+  annotations and cropping, multipart/form-data server upload (POST /api/keyimage/upload with
+  fields: image, study_iuid, series_iuid, sop_iuid), loading indicator during upload,
+  success/error notifications, auto-cleanup of crop on save/close. Upload URL configured via
+  config.keyimageUploadUrl. Crop tool completely independent from annotations, no conflicts.
