@@ -225,7 +225,25 @@ class TextTool extends ArrowAnnotateTool {
         annotationUID,
       };
 
-      const textBoxOptions = this.getLinkedTextBoxStyle(styleSpecifierWithAnnotation, annotationItem);
+      const baseStyle = this.getLinkedTextBoxStyle(styleSpecifierWithAnnotation, annotationItem);
+      // Clone to avoid persistent mutations of the style object
+      const textBoxOptions = { ...baseStyle };
+
+      // Get zoom level for scaling
+      const zoom = viewport.getZoom();
+
+      // Scale all visual properties to match viewport zoom.
+      // This ensures the entire text box (font, padding, borders) scales proportionally with the image.
+      const baseFontSize = parseFloat(baseStyle.fontSize) || 14;
+      textBoxOptions.fontSize = `${baseFontSize * zoom}px`;
+
+      // Use a default padding of 5 if not in style, and scale it
+      const basePadding = baseStyle.padding !== undefined ? baseStyle.padding : 5;
+      textBoxOptions.padding = basePadding * zoom;
+
+      // Scale line width for the box border (default 2.5 as set in initCornerstoneTools)
+      const baseLineWidth = baseStyle.lineWidth !== undefined ? baseStyle.lineWidth : 2.5;
+      textBoxOptions.lineWidth = baseLineWidth * zoom;
 
       // Get text from annotation
       const textLines = data.text ? [data.text] : [''];
@@ -255,14 +273,21 @@ class TextTool extends ArrowAnnotateTool {
       let textWidth: number;
       let textHeight: number;
 
-      if (data.handles.textBox.cachedSize && data.handles.textBox.cachedText === currentText) {
+      // Use a consistent precision for zoom comparison to avoid float noise
+      const zoomForCache = Math.round(zoom * 1000) / 1000;
+      const textBoxData = data.handles.textBox as any;
+
+      if (
+        textBoxData.cachedSize &&
+        textBoxData.cachedText === currentText &&
+        textBoxData.cachedZoom === zoomForCache
+      ) {
         // Use cached size
-        textWidth = data.handles.textBox.cachedSize.width;
-        textHeight = data.handles.textBox.cachedSize.height;
+        textWidth = textBoxData.cachedSize.width;
+        textHeight = textBoxData.cachedSize.height;
       } else {
         // Need to get text size
         // First render at approximate position to get size, then re-render at correct position
-        // We'll use the real element but update its position after getting the size
         const approximatePosition: Types.Point2 = textBoxCenterCanvas;
         const tempBoundingBox = drawing.drawTextBox(
           svgDrawingHelper,
@@ -280,9 +305,10 @@ class TextTool extends ArrowAnnotateTool {
         textWidth = tempBoundingBox.width;
         textHeight = tempBoundingBox.height;
 
-        // Cache size for next render
-        data.handles.textBox.cachedSize = { width: textWidth, height: textHeight };
-        data.handles.textBox.cachedText = currentText;
+        // Cache size and zoom (with precision) for next render
+        textBoxData.cachedSize = { width: textWidth, height: textHeight };
+        textBoxData.cachedText = currentText;
+        textBoxData.cachedZoom = zoomForCache;
 
         // Now we have the size, so we'll re-render at the correct position below
         // The element will be updated in place by the next drawTextBox call
