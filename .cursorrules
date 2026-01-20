@@ -81,3 +81,5 @@ Keep entries brief and focused on what matters for future context.
   fields: image, study_iuid, series_iuid, sop_iuid), loading indicator during upload,
   success/error notifications, auto-cleanup of crop on save/close. Upload URL configured via
   config.keyimageUploadUrl. Crop tool completely independent from annotations, no conflicts.
+- Scalable Annotations: implemented zoom-aware scaling for Text and Arrow tools in `cornerstone` extension.
+- Custom ArrowTool: created a custom tool with larger, scalable arrowheads (base 15px, 30° angle) for better visibility.
