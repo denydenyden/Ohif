@@ -1,4 +1,4 @@
-import { ArrowAnnotateTool, drawing } from '@cornerstonejs/tools';
+import { ArrowAnnotateTool, drawing, annotation } from '@cornerstonejs/tools';
 import type { Types } from '@cornerstonejs/core';
 
 /**
@@ -9,7 +9,7 @@ class ArrowTool extends ArrowAnnotateTool {
   static toolName = 'Arrow';
 
   // Переопределяем handleSelectedCallback чтобы не вызывать getTextCallback
-  handleSelectedCallback = (evt: Types.InteractionEventType, annotation: any) => {
+  handleSelectedCallback = (evt: Types.InteractionEventType, annotationItem: any) => {
     // Сохраняем оригинальную конфигурацию
     const originalConfig = { ...this.configuration };
 
@@ -28,7 +28,7 @@ class ArrowTool extends ArrowAnnotateTool {
 
     try {
       // Вызываем родительский метод
-      const result = super.handleSelectedCallback(evt, annotation);
+      const result = super.handleSelectedCallback(evt, annotationItem, this.getToolName());
       return result;
     } finally {
       // Восстанавливаем оригинальную конфигурацию
@@ -36,96 +36,146 @@ class ArrowTool extends ArrowAnnotateTool {
     }
   };
 
-  renderAnnotation = (enabledElement: Types.IEnabledElement, svgDrawingHelper: any): void => {
-    const { viewport } = enabledElement;
-    const { element } = enabledElement;
+  /**
+   * Рисует стрелку с кастомным размером наконечника и масштабированием
+   */
+  private _drawCustomArrow(
+    svgDrawingHelper: any,
+    annotationUID: string,
+    arrowUID: string,
+    start: Types.Point2,
+    end: Types.Point2,
+    options: { color: string; width: number },
+    zoom: number
+  ) {
+    const { color, width } = options;
+    // Увеличенный размер наконечника (базовый 15 вместо 10) + масштабирование
+    const headLength = 15 * zoom;
+    const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
 
-    const annotations = this.filterInteractableAnnotationsForElement(element, enabledElement);
+    // Рисуем основную линию
+    drawing.drawLine(svgDrawingHelper, annotationUID, arrowUID, start, end, {
+      color,
+      width,
+    });
+
+    // Рисуем "усики" стрелки (наконечник)
+    // Используем угол PI/6 (30 градусов) для более выразительного наконечника
+    const headAngle = Math.PI / 6;
+
+    const firstLineStart: Types.Point2 = [
+      end[0] - headLength * Math.cos(angle - headAngle),
+      end[1] - headLength * Math.sin(angle - headAngle),
+    ];
+
+    const secondLineStart: Types.Point2 = [
+      end[0] - headLength * Math.cos(angle + headAngle),
+      end[1] - headLength * Math.sin(angle + headAngle),
+    ];
+
+    drawing.drawLine(svgDrawingHelper, annotationUID, `${arrowUID}-head1`, firstLineStart, end, {
+      color,
+      width,
+    });
+    drawing.drawLine(svgDrawingHelper, annotationUID, `${arrowUID}-head2`, secondLineStart, end, {
+      color,
+      width,
+    });
+  }
+
+  renderAnnotation = (enabledElement: Types.IEnabledElement, svgDrawingHelper: any): boolean => {
+    const { viewport } = enabledElement;
+    const { element } = viewport;
+
+    const annotations = annotation.state.getAnnotations(this.getToolName(), element);
 
     if (!annotations?.length) {
-      return;
+      return false;
     }
 
     const styleSpecifier = {
       toolName: this.getToolName(),
-      viewportId: enabledElement.viewport.id,
+      viewportId: viewport.id,
     };
 
     for (let i = 0; i < annotations.length; i++) {
-      const annotation = annotations[i];
-      const annotationUID = annotation.annotationUID;
+      const annotationItem = annotations[i] as any;
+      const annotationUID = annotationItem.annotationUID;
 
-      styleSpecifier.annotationUID = annotationUID;
+      const style = this.getLinkedTextBoxStyle({ ...styleSpecifier, annotationUID }, annotationItem);
 
-      const style = this.getAnnotationStyle({
-        annotation,
-        styleSpecifier,
-      });
       // Всегда используем белый цвет для аннотаций (включая активные)
       const color = 'rgb(255, 255, 255)';
-      // Всегда используем сплошные линии (не пунктирные)
-      const lineDash = '';
       const lineWidth = style.lineWidth;
 
-      const { data } = annotation;
+      const { data } = annotationItem;
       const { points } = data.handles;
 
       // Рендерим только стрелку, без текста
-      // Обрабатываем как завершенные аннотации, так и preview (во время drag)
       if (points && points.length >= 2) {
         const canvasCoordinates = points.map(p => viewport.worldToCanvas(p));
         const start = canvasCoordinates[0];
         const end = canvasCoordinates[1];
 
-        // Рисуем стрелку используя встроенный метод drawing.drawArrow
-        // Порядок: конец стрелки, начало стрелки (как в DICOMSRDisplayTool)
         const arrowUID = `${annotationUID}-arrow`;
         const borderUID = `${annotationUID}-arrow-border`;
-        const width = parseFloat(lineWidth) || 1.5;
 
-        // Рисуем черную границу стрелки
-        drawing.drawArrow(
+        // Масштабируем толщину линии в зависимости от зума
+        const zoom = viewport.getZoom();
+        const baseWidth = parseFloat(lineWidth as string) || 1.5;
+        const width = baseWidth * zoom;
+
+        // Рисуем черную границу стрелки (масштабируем и толщину границы)
+        this._drawCustomArrow(
           svgDrawingHelper,
           annotationUID,
           borderUID,
-          end, // конец стрелки (куда указывает)
-          start, // начало стрелки (откуда идет)
+          start,
+          end,
           {
             color: 'rgb(0, 0, 0)',
-            width: width + 2,
-          }
+            width: width + 2 * zoom,
+          },
+          zoom
         );
         // Рисуем белую стрелку поверх
-        drawing.drawArrow(
+        this._drawCustomArrow(
           svgDrawingHelper,
           annotationUID,
           arrowUID,
-          end, // конец стрелки (куда указывает)
-          start, // начало стрелки (откуда идет)
+          start,
+          end,
           {
             color,
             width: width,
-          }
+          },
+          zoom
         );
-      } else if (points && points.length === 1 && annotation.isPreview) {
+      } else if (points && points.length === 1 && annotationItem.isPreview) {
         // Если только одна точка и это preview (во время drag), показываем точку
         const canvasCoordinate = viewport.worldToCanvas(points[0]);
         const pointUID = `${annotationUID}-point`;
         const borderUID = `${annotationUID}-point-border`;
-        const width = parseFloat(lineWidth) || 1.5;
+
+        // Масштабируем толщину линии в зависимости от зума
+        const zoom = viewport.getZoom();
+        const baseWidth = parseFloat(lineWidth as string) || 1.5;
+        const width = baseWidth * zoom;
 
         // Рисуем черную границу точки
-        drawing.drawCircle(svgDrawingHelper, annotationUID, borderUID, canvasCoordinate, 3, {
+        drawing.drawCircle(svgDrawingHelper, annotationUID, borderUID, canvasCoordinate, 3 * zoom, {
           color: 'rgb(0, 0, 0)',
-          lineWidth: width + 2,
+          lineWidth: width + 2 * zoom,
         });
         // Рисуем белую точку поверх
-        drawing.drawCircle(svgDrawingHelper, annotationUID, pointUID, canvasCoordinate, 3, {
+        drawing.drawCircle(svgDrawingHelper, annotationUID, pointUID, canvasCoordinate, 3 * zoom, {
           color,
           lineWidth: width,
         });
       }
     }
+
+    return true;
   };
 }
 
