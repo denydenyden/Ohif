@@ -161,7 +161,7 @@ const makeDisplaySet = (instances, index) => {
 };
 
 const isSingleImageModality = modality => {
-  return modality === 'CR' || modality === 'MG' || modality === 'DX';
+  return modality === 'CR' || modality === 'MG' || modality === 'DX' || modality === 'SC';
 };
 
 function getSopClassUids(instances) {
