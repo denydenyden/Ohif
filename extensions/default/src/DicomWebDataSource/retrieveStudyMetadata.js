@@ -85,7 +85,9 @@ export function retrieveStudyMetadata(
  * @param {String} StudyInstanceUID The UID of the Study to be removed from cache
  */
 export function deleteStudyMetadataPromise(StudyInstanceUID) {
-  if (StudyMetaDataPromises.has(StudyInstanceUID)) {
-    StudyMetaDataPromises.delete(StudyInstanceUID);
+  for (const key of StudyMetaDataPromises.keys()) {
+    if (key.endsWith(`:${StudyInstanceUID}`) || key === StudyInstanceUID) {
+      StudyMetaDataPromises.delete(key);
+    }
   }
 }

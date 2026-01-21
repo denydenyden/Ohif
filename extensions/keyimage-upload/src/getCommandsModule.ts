@@ -6,6 +6,7 @@ import getActiveViewportEnabledElement from '../../cornerstone/src/utils/getActi
 function getCommandsModule({
   servicesManager,
   commandsManager,
+  extensionManager,
 }: Types.Extensions.ExtensionParams): Types.Extensions.CommandsModule {
   const { viewportGridService, cornerstoneViewportService } = servicesManager.services;
 
@@ -93,6 +94,7 @@ function getCommandsModule({
             initialImageIndex,
             servicesManager,
             commandsManager,
+            extensionManager,
             onClose: safeHide,
           },
           containerClassName: 'w-[90vw] h-[90vh] max-w-none max-h-none p-0',

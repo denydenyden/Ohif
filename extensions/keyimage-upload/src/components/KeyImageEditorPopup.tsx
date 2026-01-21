@@ -4,6 +4,7 @@ import { ToolGroupManager, annotation as annotationModule } from '@cornerstonejs
 import { ToolButton, Icons, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@ohif/ui-next';
 import ToolButtonListWrapper from '@ohif/extension-default/src/Toolbar/ToolButtonListWrapper';
 import { useToolbar } from '@ohif/core/src/hooks/useToolbar';
+import { DicomMetadataStore } from '@ohif/core';
 import type { Types } from '@ohif/core';
 
 // Lazy load OHIFCornerstoneViewport component
@@ -24,6 +25,7 @@ interface KeyImageEditorPopupProps {
   initialImageIndex: number;
   servicesManager: any;
   commandsManager: any;
+  extensionManager: any;
   onClose: () => void;
 }
 
@@ -35,6 +37,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
   initialImageIndex,
   servicesManager,
   commandsManager,
+  extensionManager,
   onClose,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -156,11 +159,11 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       cropArea ||
       (dragState?.type === 'create'
         ? {
-            x: Math.min(dragState.startX, dragState.startX), // simplified for now, will calculate in realtime during create
-            y: Math.min(dragState.startY, dragState.startY),
-            width: 0,
-            height: 0,
-          }
+          x: Math.min(dragState.startX, dragState.startX), // simplified for now, will calculate in realtime during create
+          y: Math.min(dragState.startY, dragState.startY),
+          width: 0,
+          height: 0,
+        }
         : null);
 
     if (!crop) return;
@@ -622,7 +625,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-        // Update cursor style if not dragging
+      // Update cursor style if not dragging
       if (!dragState && cropArea) {
         const handle = getHandleAtPosition(x, y, cropArea);
         canvas.style.cursor = handle ? getCursorStyle(handle) : 'crosshair';
@@ -630,8 +633,8 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       }
 
       if (!dragState) {
-          canvas.style.cursor = 'crosshair';
-          return;
+        canvas.style.cursor = 'crosshair';
+        return;
       }
 
       // Handle Dragging
@@ -652,40 +655,40 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           y: clampedY,
         });
       } else if (dragState.type === 'resize') {
-          const { originalCrop, handle } = dragState;
-          let newX = originalCrop.x;
-          let newY = originalCrop.y;
-          let newWidth = originalCrop.width;
-          let newHeight = originalCrop.height;
+        const { originalCrop, handle } = dragState;
+        let newX = originalCrop.x;
+        let newY = originalCrop.y;
+        let newWidth = originalCrop.width;
+        let newHeight = originalCrop.height;
 
-          // Horizontal Resize
-          if (handle?.includes('e')) {
-              newWidth = Math.max(10, originalCrop.width + dx);
-          } else if (handle?.includes('w')) {
-              const proposedWidth = originalCrop.width - dx;
-               if (proposedWidth > 10) {
-                  newX = originalCrop.x + dx;
-                  newWidth = proposedWidth;
-               }
+        // Horizontal Resize
+        if (handle?.includes('e')) {
+          newWidth = Math.max(10, originalCrop.width + dx);
+        } else if (handle?.includes('w')) {
+          const proposedWidth = originalCrop.width - dx;
+          if (proposedWidth > 10) {
+            newX = originalCrop.x + dx;
+            newWidth = proposedWidth;
           }
+        }
 
-          // Vertical Resize
-          if (handle?.includes('s')) {
-              newHeight = Math.max(10, originalCrop.height + dy);
-          } else if (handle?.includes('n')) {
-              const proposedHeight = originalCrop.height - dy;
-              if (proposedHeight > 10) {
-                  newY = originalCrop.y + dy;
-                  newHeight = proposedHeight;
-              }
+        // Vertical Resize
+        if (handle?.includes('s')) {
+          newHeight = Math.max(10, originalCrop.height + dy);
+        } else if (handle?.includes('n')) {
+          const proposedHeight = originalCrop.height - dy;
+          if (proposedHeight > 10) {
+            newY = originalCrop.y + dy;
+            newHeight = proposedHeight;
           }
+        }
 
-          setCropArea({
-              x: newX,
-              y: newY,
-              width: newWidth,
-              height: newHeight,
-          });
+        setCropArea({
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        });
 
       } else if (dragState.type === 'create') {
         const startX = dragState.startX;
@@ -786,7 +789,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
       setCropArea(null);
       setDragState(null);
 
-      // Show success notification
+      // Show success notification immediately
       const { uiNotificationService } = servicesManager.services;
       uiNotificationService.show({
         title: 'Success',
@@ -794,6 +797,69 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
         type: 'success',
         duration: 5000,
       });
+
+      // Trigger OHIF browser refresh in background (non-blocking)
+      // Using setTimeout to not block the user and allow them to continue working
+      const studyUID = metadata.studyInstanceUID;
+      if (studyUID) {
+        setTimeout(async () => {
+          try {
+            const { displaySetService } = servicesManager.services;
+            const dataSource = extensionManager.getActiveDataSource()[0];
+
+            if (dataSource && displaySetService) {
+              console.log('[KeyImage] STARTING BACKGROUND REFRESH');
+              console.log('[KeyImage] Triggering study refresh for:', studyUID);
+
+              // Wait for PACS to process the new DICOM file
+              await new Promise(resolve => setTimeout(resolve, 1500));
+
+              // Clear the cached metadata promise to force a fresh fetch from the server
+              if (dataSource.deleteStudyMetadataPromise) {
+                console.log('[KeyImage] Clearing metadata cache for study:', studyUID);
+                dataSource.deleteStudyMetadataPromise(studyUID);
+              }
+
+              // Get current series UIDs before refresh to detect new ones
+              const existingSeriesUIDs = new Set<string>();
+              const existingDisplaySets = displaySetService.getActiveDisplaySets();
+              existingDisplaySets.forEach((ds: any) => {
+                if (ds.StudyInstanceUID === studyUID) {
+                  existingSeriesUIDs.add(ds.SeriesInstanceUID);
+                }
+              });
+              console.log('[KeyImage] Existing series count:', existingSeriesUIDs.size);
+
+              // Fetch fresh series metadata from data source
+              const seriesMetadata = await dataSource.retrieve.series.metadata({
+                StudyInstanceUID: studyUID,
+                madeInClient: true
+              });
+
+              console.log('[KeyImage] Series metadata retrieved:', seriesMetadata);
+
+              // Create display sets only for NEW series that weren't present before
+              const studyMetadata = DicomMetadataStore.getStudy(studyUID);
+              if (studyMetadata && studyMetadata.series) {
+                let newSeriesCount = 0;
+                studyMetadata.series.forEach((series: any) => {
+                  if (series.instances && series.instances.length > 0) {
+                    // Check if this is a new series
+                    if (!existingSeriesUIDs.has(series.SeriesInstanceUID)) {
+                      console.log('[KeyImage] Creating display set for new series:', series.SeriesInstanceUID);
+                      displaySetService.makeDisplaySets(series.instances, { madeInClient: true });
+                      newSeriesCount++;
+                    }
+                  }
+                });
+                console.log('[KeyImage] Created', newSeriesCount, 'new display sets');
+              }
+            }
+          } catch (refreshError) {
+            console.warn('[KeyImage] Error refreshing OHIF browser:', refreshError);
+          }
+        }, 0);
+      }
 
       // Don't close popup automatically - let user close it manually
     } catch (error) {
@@ -908,11 +974,11 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
         const sourceH = Math.min(outputHeight, nativeHeight - sourceY);
 
         if (sourceW > 0 && sourceH > 0) {
-            ctx.drawImage(
-                canvas,
-                sourceX, sourceY, sourceW, sourceH, // Source
-                drawX, drawY, sourceW, sourceH      // Dest
-            );
+          ctx.drawImage(
+            canvas,
+            sourceX, sourceY, sourceW, sourceH, // Source
+            drawX, drawY, sourceW, sourceH      // Dest
+          );
         }
 
         // Draw SVG Overlay
@@ -992,19 +1058,19 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           };
           img.onerror = function () {
             URL.revokeObjectURL(url);
-             outputCanvas.toBlob(
-                blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
-                'image/png',
-                1.0
-              );
+            outputCanvas.toBlob(
+              blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
+              'image/png',
+              1.0
+            );
           };
           img.src = url;
         } else {
-           outputCanvas.toBlob(
-                blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
-                'image/png',
-                1.0
-              );
+          outputCanvas.toBlob(
+            blob => blob ? resolve(blob) : reject(new Error('Failed to create PNG')),
+            'image/png',
+            1.0
+          );
         }
       } catch (e) {
         reject(new Error('Error creating PNG: ' + (e as Error).message));
@@ -1108,7 +1174,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           // Check if this line is part of an Arrow (has markers)
           // If so, DO NOT hide it.
           if (element.getAttribute('marker-end') || element.getAttribute('marker-start')) {
-             break; // Stop looking this direction, it's an arrow
+            break; // Stop looking this direction, it's an arrow
           }
 
           if (removeInsteadOfHide) {
@@ -1310,7 +1376,7 @@ const KeyImageEditorPopup: React.FC<KeyImageEditorPopupProps> = ({
           <Select
             value={
               annotationLineWidth === 1.5 ? 'small' :
-              annotationLineWidth === 2.5 ? 'medium' : 'large'
+                annotationLineWidth === 2.5 ? 'medium' : 'large'
             }
             onValueChange={handleLineWidthChange}
           >

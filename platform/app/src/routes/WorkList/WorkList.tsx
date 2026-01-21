@@ -365,30 +365,30 @@ function WorkList({
           seriesTableDataSource={
             seriesInStudiesMap.has(studyInstanceUid)
               ? seriesInStudiesMap.get(studyInstanceUid).map(s => {
-                  return {
-                    description: s.description || '(empty)',
-                    seriesNumber: s.seriesNumber ?? '',
-                    modality: s.modality || '',
-                    instances: s.numSeriesInstances || '',
-                  };
-                })
+                return {
+                  description: s.description || '(empty)',
+                  seriesNumber: s.seriesNumber ?? '',
+                  modality: s.modality || '',
+                  instances: s.numSeriesInstances || '',
+                };
+              })
               : []
           }
         >
           <div className="flex flex-row gap-2">
             {(appConfig.groupEnabledModesFirst
               ? appConfig.loadedModes.sort((a, b) => {
-                  const isValidA = a.isValidMode({
-                    modalities: modalities.replaceAll('/', '\\'),
-                    study,
-                  }).valid;
-                  const isValidB = b.isValidMode({
-                    modalities: modalities.replaceAll('/', '\\'),
-                    study,
-                  }).valid;
+                const isValidA = a.isValidMode({
+                  modalities: modalities.replaceAll('/', '\\'),
+                  study,
+                }).valid;
+                const isValidB = b.isValidMode({
+                  modalities: modalities.replaceAll('/', '\\'),
+                  study,
+                }).valid;
 
-                  return isValidB - isValidA;
-                })
+                return isValidB - isValidA;
+              })
               : appConfig.loadedModes
             ).map((mode, i) => {
               if (mode.hide) {
@@ -432,7 +432,7 @@ function WorkList({
                         event.preventDefault();
                       }
                     }}
-                    // to={`${mode.routeName}/dicomweb?StudyInstanceUIDs=${studyInstanceUid}`}
+                  // to={`${mode.routeName}/dicomweb?StudyInstanceUIDs=${studyInstanceUid}`}
                   >
                     {/* TODO revisit the completely rounded style of buttons used for launching a mode from the worklist later */}
                     <Button
@@ -453,9 +453,9 @@ function WorkList({
                           <Icons.LaunchInfo className="!h-[20px] !w-[20px] text-black" />
                         )
                       }
-                      onClick={() => {}}
+                      onClick={() => { }}
                       dataCY={`mode-${mode.routeName}-${studyInstanceUid}`}
-                      className={!isValidMode && 'bg-[#222d44]'}
+                      className={!isValidMode ? 'bg-[#222d44]' : undefined}
                     >
                       {mode.displayName}
                     </Button>
@@ -523,28 +523,28 @@ function WorkList({
   const uploadProps =
     DicomUploadComponent && dataSource.getConfig()?.dicomUploadEnabled
       ? {
-          title: 'Upload files',
-          containerClassName: DicomUploadComponent?.containerClassName,
-          closeButton: true,
-          shouldCloseOnEsc: false,
-          shouldCloseOnOverlayClick: false,
-          content: () => (
-            <DicomUploadComponent
-              dataSource={dataSource}
-              onComplete={() => {
-                hide();
-                onRefresh();
-              }}
-              onStarted={() => {
-                show({
-                  ...uploadProps,
-                  // when upload starts, hide the default close button as closing the dialogue must be handled by the upload dialogue itself
-                  closeButton: false,
-                });
-              }}
-            />
-          ),
-        }
+        title: 'Upload files',
+        containerClassName: DicomUploadComponent?.containerClassName,
+        closeButton: true,
+        shouldCloseOnEsc: false,
+        shouldCloseOnOverlayClick: false,
+        content: () => (
+          <DicomUploadComponent
+            dataSource={dataSource}
+            onComplete={() => {
+              hide();
+              onRefresh();
+            }}
+            onStarted={() => {
+              show({
+                ...uploadProps,
+                // when upload starts, hide the default close button as closing the dialogue must be handled by the upload dialogue itself
+                closeButton: false,
+              });
+            }}
+          />
+        ),
+      }
       : undefined;
 
   const dataSourceConfigurationComponent = customizationService.getCustomization(

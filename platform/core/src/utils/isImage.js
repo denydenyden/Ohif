@@ -61,5 +61,9 @@ export const isImage = SOPClassUID => {
   if (!SOPClassUID) {
     return false;
   }
-  return imagesTypes.indexOf(SOPClassUID) !== -1;
+  const result = imagesTypes.indexOf(SOPClassUID) !== -1;
+  if (SOPClassUID === '1.2.840.10008.5.1.4.1.1.7') {
+    console.log('[isImage] Checking SC SOPClassUID:', SOPClassUID, 'Result:', result);
+  }
+  return result;
 };

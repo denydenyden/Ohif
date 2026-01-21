@@ -148,9 +148,9 @@ const makeDisplaySet = (instances, index) => {
   );*/
 
   /*const isReconstructable = isDisplaySetReconstructable(series, instances);
-
+ 
   imageSet.isReconstructable = isReconstructable.value;
-
+ 
   if (isReconstructable.missingFrames) {
     // TODO -> This is currently unused, but may be used for reconstructing
     // Volumes with gaps later on.
@@ -161,7 +161,8 @@ const makeDisplaySet = (instances, index) => {
 };
 
 const isSingleImageModality = modality => {
-  return modality === 'CR' || modality === 'MG' || modality === 'DX' || modality === 'SC';
+  const m = modality ? modality.trim() : '';
+  return m === 'CR' || m === 'MG' || m === 'DX';
 };
 
 function getSopClassUids(instances) {
@@ -191,6 +192,11 @@ function getDisplaySetsFromSeries(instances) {
   const displaySets = [];
   const sopClassUids = getSopClassUids(instances);
 
+  console.log('[SOPClassHandler] Processing series with instances:', instances.length);
+  if (instances.length > 0) {
+    console.log('[SOPClassHandler] First instance modality:', instances[0].Modality);
+  }
+
   // Search through the instances (InstanceMetadata object) of this series
   // Split Multi-frame instances and Single-image modalities
   // into their own specific display sets. Place the rest of each
@@ -213,6 +219,7 @@ function getDisplaySetsFromSeries(instances) {
       });
       displaySets.push(displaySet);
     } else if (isSingleImageModality(instance.Modality)) {
+      console.log('[SOPClassHandler] Found single image modality:', instance.Modality);
       displaySet = makeDisplaySet([instance], instanceIndex);
       displaySet.setAttributes({
         sopClassUids,

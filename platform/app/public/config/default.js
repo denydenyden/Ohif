@@ -24,6 +24,16 @@ window.config = {
       wadoUriRoot: 'https://rrpl146.raddico.com/dcm4chee-arc/aets/DCM4CHEE/wado',
       qidoSupportsIncludeField: true,
       singlepart: 'auto',
+
+      qidoConfig: {
+        url: 'https://rrpl146.raddico.com/dcm4chee-arc/aets/DCM4CHEE/rs',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      },
+
       // Configuration to support SC (Secondary Capture) series
       sopClassHandlerExtensions: {
         '1.2.840.10008.5.1.4.1.1.7': '@ohif/extension-default.sopClassHandlerModule.stack', // Secondary Capture Image Storage
